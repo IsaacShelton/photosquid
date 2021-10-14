@@ -1,0 +1,20 @@
+# Custom build of glium_text_rusttype that will use our target glium version
+
+[package]
+name = "glium_text_rusttype"
+version = "0.0.0"
+edition = "2018"
+
+[dependencies]
+rusttype = "0.8"
+
+[dependencies.glium]
+default-features = false
+version = "0.30.2"
+
+[dev-dependencies]
+cgmath = "0.18"
+
+[dev-dependencies.glium]
+features = ["glutin"]
+version = "0.30.2"

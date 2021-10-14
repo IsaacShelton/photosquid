@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "photosquid",
+    "glium_text_rusttype"
+]

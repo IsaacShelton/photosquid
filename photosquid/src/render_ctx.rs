@@ -4,7 +4,7 @@ use crate::{
     color_scheme::ColorScheme,
     mesh::{MeshXyz, MeshXyzUv},
 };
-use glium::{framebuffer::SimpleFrameBuffer, Frame};
+use glium::{framebuffer::SimpleFrameBuffer, Display, Frame};
 use glium_text_rusttype::{self as glium_text, FontTexture, TextDisplay, TextSystem};
 use nalgebra_glm as glm;
 
@@ -25,6 +25,7 @@ pub struct RenderCtx<'a, 'f> {
     pub square_xyzuv: &'a MeshXyzUv,
     pub color_scheme: &'a ColorScheme,
     pub camera: &'a glm::Vec2,
+    pub display: &'a Display,
 }
 
 impl RenderCtx<'_, '_> {

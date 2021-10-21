@@ -5,15 +5,20 @@ use crate::{
     matrix_helpers::reach_inside_mat4,
     mesh::MeshXyz,
     render_ctx::RenderCtx,
-    tool::{Capture, Interaction},
+    tool::{Capture, Interaction, Tool},
     tool_button::ToolButton,
     ColorScheme,
 };
 use glium::glutin::event::MouseButton;
 use glium::Display;
+use glium_text_rusttype::{FontTexture, TextSystem};
 use interpolation::{Ease, Lerp};
 use nalgebra_glm as glm;
-use std::time::{Duration, Instant};
+use slotmap::SlotMap;
+use std::{
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 pub struct ToolBox {
     buttons: Vec<ToolButton>,
@@ -44,17 +49,18 @@ impl ToolBox {
     }
 
     pub fn select(&mut self, index: usize) {
-        for button in self.buttons.iter_mut() {
-            button.animate(false);
-        }
-
         if index < self.buttons.len() {
+            for button in self.buttons.iter_mut() {
+                button.animate(false);
+            }
+
             self.buttons[index].animate(true);
             self.selection.select(index);
         }
     }
 
     pub fn click(&mut self, button: MouseButton, mouse: &glm::Vec2, screen_width: f32, screen_height: f32) -> bool {
+        // Tool ribbon
         if button == MouseButton::Left && mouse.x < self.width {
             let index = self.get_index_for_mouse_y(mouse.y, screen_height);
 
@@ -65,6 +71,7 @@ impl ToolBox {
             return true;
         }
 
+        // Squid options ribbon
         if button == MouseButton::Left && mouse.x > screen_width - 256.0 {
             let _ = self.color_picker.click(button, mouse, screen_width);
             return true;
@@ -134,20 +141,33 @@ impl ToolBox {
         Some(self.buttons.get(self.selection.index)?.tool_key)
     }
 
-    pub fn render(&self, ctx: &mut RenderCtx, ribbon_mesh: &MeshXyz, color_scheme: &ColorScheme) {
+    pub fn render(
+        &self,
+        ctx: &mut RenderCtx,
+        tools: &mut SlotMap<ToolKey, Box<dyn Tool>>,
+        color_scheme: &ColorScheme,
+        text_system: &TextSystem,
+        font: Rc<FontTexture>,
+    ) {
         // Background
-        ribbon_mesh.render(ctx, 0.0, 0.0, self.full_width, ctx.height, &color_scheme.dark_ribbon);
+        ctx.ribbon_mesh.render(ctx, 0.0, 0.0, self.full_width, ctx.height, &color_scheme.dark_ribbon);
 
         // Icons
         for button in self.buttons.iter() {
             button.render(ctx, &color_scheme.foreground);
         }
 
+        // Tool Options
+        if let Some(tool_key) = self.get_selected() {
+            tools[tool_key].render_options(ctx, text_system, font);
+        }
+
         // Selection
         self.selection.render(ctx, &color_scheme.foreground);
 
         // Options background
-        ribbon_mesh.render(ctx, ctx.width - 256.0, 0.0, 256.0, ctx.height, &color_scheme.dark_ribbon);
+        ctx.ribbon_mesh
+            .render(ctx, ctx.width - 256.0, 0.0, 256.0, ctx.height, &color_scheme.dark_ribbon);
 
         // Draw hue/value picker
         self.color_picker.render(ctx);

@@ -5,7 +5,7 @@ use crate::{
     ocean::{Ocean, Selection},
     smooth::Smooth,
     squid::SquidRef,
-    tool::{Capture, Interaction},
+    tool::{Capture, Interaction, Tool, ToolKey},
     toolbox::ToolBox,
 };
 use glium::{
@@ -14,7 +14,12 @@ use glium::{
 };
 use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;
-use std::{collections::btree_set::BTreeSet, rc::Rc, time::Instant};
+use slotmap::SlotMap;
+use std::{
+    collections::{btree_set::BTreeSet, HashMap},
+    rc::Rc,
+    time::Instant,
+};
 
 pub const MULTISAMPLING_COUNT: u16 = 4;
 
@@ -43,6 +48,24 @@ pub struct ApplicationState {
     pub text_system: TextSystem,
     pub font: Rc<FontTexture>,
     pub context_menu: Option<ContextMenu>,
+    pub numeric_mappings: HashMap<VirtualKeyCode, char>,
+    pub interaction_options: InteractionOptions,
+}
+
+pub struct InteractionOptions {
+    pub translation_snapping: f32,
+    pub rotation_snapping: f32,
+    pub duplication_offset: glm::Vec2,
+}
+
+impl InteractionOptions {
+    pub fn new() -> Self {
+        Self {
+            translation_snapping: 0.0,
+            rotation_snapping: 0.0,
+            duplication_offset: glm::zero(),
+        }
+    }
 }
 
 impl ApplicationState {
@@ -51,19 +74,33 @@ impl ApplicationState {
     pub fn try_interact_with_selections(&mut self, interaction: &Interaction) -> Capture {
         for (reference, squid) in self.ocean.get_squids_newest_mut() {
             if selection_contains(&self.selections, reference) {
-                squid.interact(interaction, &self.camera.get_animated())?;
+                squid.interact(interaction, &self.camera.get_animated(), &self.interaction_options)?;
             }
         }
 
         Capture::Miss
     }
 
-    pub fn press_key(&mut self, key: &VirtualKeyCode) {
+    pub fn press_key(&mut self, key: &VirtualKeyCode, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>) {
+        if let Some(tool_key) = self.toolbox.get_selected() {
+            if tools[tool_key].interact_options(Interaction::Key { virtual_keycode: *key }, self) != Capture::Miss {
+                return;
+            }
+        }
+
         match key {
             VirtualKeyCode::Key1 => self.toolbox.select(0),
             VirtualKeyCode::Key2 => self.toolbox.select(1),
             VirtualKeyCode::Key3 => self.toolbox.select(2),
+            VirtualKeyCode::Key4 => self.toolbox.select(3),
+            VirtualKeyCode::Key5 => self.toolbox.select(4),
+            VirtualKeyCode::Key6 => self.toolbox.select(5),
+            VirtualKeyCode::Key7 => self.toolbox.select(6),
+            VirtualKeyCode::Key8 => self.toolbox.select(7),
+            VirtualKeyCode::Key9 => self.toolbox.select(8),
+            VirtualKeyCode::Key0 => self.toolbox.select(9),
             VirtualKeyCode::X => self.delete_selected(),
+            VirtualKeyCode::Escape => self.context_menu = None,
             VirtualKeyCode::D => {
                 if self.keys_held.contains(&VirtualKeyCode::LShift) {
                     self.duplicate_selected();
@@ -83,14 +120,15 @@ impl ApplicationState {
             Capture::Miss => (),
             Capture::AllowDrag => (),
             Capture::NoDrag => (),
+            Capture::Keyboard(..) => (),
             Capture::MoveSelectedSquids { delta } => {
                 for squid_id in self.get_selected_squids() {
-                    self.ocean.squids[squid_id].translate(&delta);
+                    self.ocean.squids[squid_id].translate(&delta, &self.interaction_options);
                 }
             }
             Capture::RotateSelectedSquids { delta_theta } => {
                 for squid_id in self.get_selected_squids() {
-                    self.ocean.squids[squid_id].rotate(*delta_theta);
+                    self.ocean.squids[squid_id].rotate(*delta_theta, &self.interaction_options);
                 }
             }
         }
@@ -104,7 +142,7 @@ impl ApplicationState {
     }
 
     pub fn duplicate_selected(&mut self) {
-        let offset = glm::vec2(10.0, 10.0);
+        let offset = self.interaction_options.duplication_offset;
         let created: Vec<SquidRef> = self
             .get_selected_squids()
             .iter()

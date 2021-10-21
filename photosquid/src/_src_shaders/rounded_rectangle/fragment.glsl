@@ -8,6 +8,7 @@
 uniform vec2 dimensions;
 uniform vec4 rectangle_color;
 uniform float height_scale;
+uniform int do_shadow;
 
 in vec2 pass_uvs;
 out vec4 out_color;
@@ -40,17 +41,21 @@ void main() {
     
     // Return the resultant shape.
     vec4 quad_color = mix(
-        vec4(0.0, 0.0, 0.0, 0.0),        // Background
-        vec4(rectangle_color.xyz, smoothed_alpha), // Rectangle Color 0.137,0.153,0.165
+        vec4(0.0, 0.0, 0.0, 0.0),                   // Background
+        vec4(rectangle_color.xyz, smoothed_alpha),
         smoothed_alpha
     );
-    
-    // Apply a drop shadow effect.
-    float shadow_softness = 20.0;
-    vec2  shadow_offset   = vec2(0.0, -5.0);
-    float shadow_distance = rounded_box_sdf(coord - location + shadow_offset - half_size, half_size, radius);
-    float shadow_alpha 	  = 1.0 - smoothstep(-shadow_softness, shadow_softness, shadow_distance);
-    vec4  shadow_color 	  = vec4(0.01, 0.01, 0.01, shadow_alpha);
 
-    out_color = mix(quad_color, shadow_color, clamp(shadow_alpha - smoothed_alpha, 0.0, 1.0));
+    if (do_shadow == 0) {
+        out_color = quad_color;
+    } else {
+        // Apply a drop shadow effect.
+        float shadow_softness = 20.0;
+        vec2  shadow_offset   = vec2(0.0, -5.0);
+        float shadow_distance = rounded_box_sdf(coord - location + shadow_offset - half_size, half_size, radius);
+        float shadow_alpha 	  = 1.0 - smoothstep(-shadow_softness, shadow_softness, shadow_distance);
+        vec4  shadow_color 	  = vec4(0.01, 0.01, 0.01, shadow_alpha);
+
+        out_color = mix(quad_color, shadow_color, clamp(shadow_alpha - smoothed_alpha, 0.0, 1.0));
+    }
 }

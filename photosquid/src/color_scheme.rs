@@ -5,4 +5,6 @@ pub struct ColorScheme {
     pub light_ribbon: Color,
     pub dark_ribbon: Color,
     pub foreground: Color,
+    pub input: Color,
+    pub error: Color,
 }

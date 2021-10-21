@@ -2,15 +2,26 @@ use super::{Capture, Interaction, Tool};
 use crate::{
     app::ApplicationState,
     ocean::{NewSelection, TrySelectResult},
+    render_ctx::RenderCtx,
+    text_input::TextInput,
+    tool,
 };
 use glium::glutin::event::{MouseButton, VirtualKeyCode};
+use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;
+use std::rc::Rc;
 
-pub struct Pointer {}
+pub struct Pointer {
+    translation_snapping_input: TextInput,
+    rotation_snapping_input: TextInput,
+}
 
 impl Pointer {
     pub fn new() -> Box<dyn Tool> {
-        Box::new(Self {})
+        Box::new(Self {
+            translation_snapping_input: TextInput::new("0".into(), "Translation Snapping".into(), "".into()),
+            rotation_snapping_input: TextInput::new("0".into(), "Rotation Snapping".into(), " degrees".into()),
+        })
     }
 
     pub fn try_select(&self, position: &glm::Vec2, app: &mut ApplicationState) {
@@ -36,7 +47,16 @@ impl Pointer {
 }
 
 impl Tool for Pointer {
-    fn interact(&self, interaction: Interaction, app: &mut ApplicationState) -> Capture {
+    fn interact(&mut self, interaction: Interaction, app: &mut ApplicationState) -> Capture {
+        // Update options
+        if let Some(new_content) = self.translation_snapping_input.poll() {
+            app.interaction_options.translation_snapping = new_content.parse::<f32>().unwrap_or_default().max(0.0);
+        }
+
+        if let Some(new_content) = self.rotation_snapping_input.poll() {
+            app.interaction_options.rotation_snapping = new_content.parse::<f32>().unwrap_or_default().max(0.0) * std::f32::consts::PI / 180.0;
+        }
+
         // First off
         // If we can interact with existing selections, prefer that over selecting different objects
         app.try_interact_with_selections(&interaction)?;
@@ -66,5 +86,18 @@ impl Tool for Pointer {
         }
 
         Capture::AllowDrag
+    }
+
+    fn interact_options(&mut self, interaction: Interaction, app: &mut ApplicationState) -> Capture {
+        tool::interact_text_inputs(vec![&mut self.translation_snapping_input, &mut self.rotation_snapping_input], interaction, app)
+    }
+
+    fn render_options(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>) {
+        tool::render_text_inputs(
+            ctx,
+            text_system,
+            font,
+            vec![&mut self.translation_snapping_input, &mut self.rotation_snapping_input],
+        )
     }
 }

@@ -1,6 +1,7 @@
 #![feature(try_trait_v2)]
 
 mod aabb;
+mod accumulator;
 mod algorithm;
 mod app;
 mod color;
@@ -17,6 +18,8 @@ mod render_ctx;
 mod shader_helpers;
 mod smooth;
 mod squid;
+mod text_helpers;
+mod text_input;
 mod tool;
 mod tool_button;
 mod toolbox;
@@ -30,7 +33,7 @@ use color_scheme::ColorScheme;
 use context_menu::ContextAction;
 use glium::{
     glutin::{
-        event::{ElementState, MouseButton},
+        event::{ElementState, MouseButton, VirtualKeyCode},
         event::{Event::WindowEvent as AbstractWindowEvent, WindowEvent as ConcreteWindowEvent},
         event_loop::{ControlFlow, EventLoop},
         window::WindowBuilder,
@@ -47,7 +50,7 @@ use render_ctx::RenderCtx;
 use slotmap::SlotMap;
 use smooth::Smooth;
 use std::{
-    collections::btree_set::BTreeSet,
+    collections::{btree_set::BTreeSet, HashMap},
     rc::Rc,
     time::{Duration, Instant},
 };
@@ -80,6 +83,8 @@ fn main() {
         light_ribbon: Color::from_hex("#2f3136"),
         dark_ribbon: Color::from_hex("#23272AFF"),
         foreground: Color::from_hex("#7289DA"),
+        input: Color::from_hex("#40444B"),
+        error: Color::from_hex("#ed2326"),
     };
 
     // Build toolbox
@@ -106,6 +111,13 @@ fn main() {
             include_str!("_src_objs/rectangle.obj"),
             Box::new(DeformPressAnimation {}),
             tools.insert(tool::Rect::new()),
+            &display,
+        ));
+
+        toolbox.add(ToolButton::new(
+            include_str!("_src_objs/triangle.obj"),
+            Box::new(DeformPressAnimation {}),
+            tools.insert(tool::Tri::new()),
             &display,
         ));
 
@@ -168,6 +180,21 @@ fn main() {
     )
     .unwrap();
 
+    let numeric_mappings: HashMap<VirtualKeyCode, char> = std::iter::FromIterator::from_iter([
+        (VirtualKeyCode::Key0, '0'),
+        (VirtualKeyCode::Key1, '1'),
+        (VirtualKeyCode::Key2, '2'),
+        (VirtualKeyCode::Key3, '3'),
+        (VirtualKeyCode::Key4, '4'),
+        (VirtualKeyCode::Key5, '5'),
+        (VirtualKeyCode::Key6, '6'),
+        (VirtualKeyCode::Key7, '7'),
+        (VirtualKeyCode::Key8, '8'),
+        (VirtualKeyCode::Key9, '9'),
+        (VirtualKeyCode::Period, '.'),
+        (VirtualKeyCode::Minus, '-'),
+    ]);
+
     let television = MeshXyzUv::new_square(&display);
     let scale_factor = display.gl_window().window().scale_factor();
 
@@ -196,6 +223,8 @@ fn main() {
         text_system,
         font: Rc::new(font),
         context_menu: None,
+        numeric_mappings,
+        interaction_options: InteractionOptions::new(),
     };
 
     event_loop.run(move |abstract_event, _, control_flow| {
@@ -207,7 +236,7 @@ fn main() {
             framebuffer_dimensions.1 as f32 / state.scale_factor as f32,
         ));
 
-        fn do_click(state: &mut ApplicationState, tools: &SlotMap<ToolKey, Box<dyn Tool>>, button: MouseButton) -> Capture {
+        fn do_click(state: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>, button: MouseButton) -> Capture {
             // Returns whether a drag is allowed to start
 
             let position = state.mouse_position.unwrap();
@@ -232,6 +261,12 @@ fn main() {
                 }
             }
 
+            // Tool options ribbon
+            if let Some(tool_key) = state.toolbox.get_selected() {
+                tools[tool_key].interact_options(Interaction::Click { button, position }, state)?;
+            }
+
+            // Tool ribbon
             if state.toolbox.click(button, &position, width, height) {
                 return Capture::AllowDrag;
             }
@@ -249,13 +284,13 @@ fn main() {
             let animated_camera = state.camera.get_animated();
 
             for (_, squid) in state.ocean.squids.iter_mut() {
-                squid.interact(&Interaction::MouseRelease { position, button }, &animated_camera);
+                squid.interact(&Interaction::MouseRelease { position, button }, &animated_camera, &state.interaction_options);
             }
 
             state.toolbox.mouse_release(button);
         }
 
-        fn do_drag(state: &mut ApplicationState, tools: &SlotMap<ToolKey, Box<dyn Tool>>) -> Capture {
+        fn do_drag(state: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>) -> Capture {
             let drag = state.dragging.as_ref().unwrap().to_interaction();
             let (width, _) = state.dimensions.unwrap_or_default();
 
@@ -283,7 +318,7 @@ fn main() {
                             ElementState::Pressed => {
                                 if keys_held.insert(virtual_keycode) {
                                     // Press first time
-                                    state.press_key(&virtual_keycode);
+                                    state.press_key(&virtual_keycode, &mut tools);
                                 } else {
                                     // Ignore / Repeat key
                                 }
@@ -298,7 +333,7 @@ fn main() {
                     state: element_state, button, ..
                 } => {
                     if element_state == ElementState::Pressed {
-                        match do_click(&mut state, &tools, button) {
+                        match do_click(&mut state, &mut tools, button) {
                             Capture::NoDrag => (),
                             capture => {
                                 state.dragging = Some(Dragging::new(state.mouse_position.unwrap_or_default()));
@@ -317,7 +352,7 @@ fn main() {
                         let logical_position = state.mouse_position.unwrap();
                         dragging.update(glm::vec2(logical_position.x, logical_position.y));
 
-                        match do_drag(&mut state, &tools) {
+                        match do_drag(&mut state, &mut tools) {
                             capture => {
                                 state.handle_captured(&capture);
                             }
@@ -368,23 +403,26 @@ fn main() {
                     square_xyzuv: &state.square_xyzuv,
                     color_scheme: &state.color_scheme,
                     camera: &state.camera.get_animated(),
+                    display: &state.display,
                 };
 
                 // Render components
                 {
                     ctx.clear_color(&state.color_scheme.background);
 
-                    for (_, squid) in state.ocean.get_squids_oldest() {
+                    for (_, squid) in state.ocean.get_squids_oldest_mut() {
                         squid.render(&mut ctx);
                     }
 
-                    for (reference, squid) in state.ocean.squids.iter_mut() {
+                    for (reference, squid) in state.ocean.get_squids_oldest_mut() {
                         if selection_contains(&state.selections, reference) {
                             squid.render_selected_indication(&mut ctx);
                         }
                     }
 
-                    state.toolbox.render(&mut ctx, &state.ribbon_mesh, &state.color_scheme);
+                    state
+                        .toolbox
+                        .render(&mut ctx, &mut tools, &state.color_scheme, &state.text_system, state.font.clone());
 
                     if let Some(context_menu) = &mut state.context_menu {
                         context_menu.render(&mut ctx, &state.text_system, state.font.clone());
@@ -416,22 +454,6 @@ fn main() {
                         )
                         .unwrap();
                 }
-
-                /*
-                // Creating a `TextDisplay` which contains the elements required to draw a specific sentence.
-                let text = glium_text::TextDisplay::new(state.text_system, state.font, &String::from("Delete - X\nDuplicate - Shift+D"));
-
-                // Finally, drawing the text is done like this:
-                let matrix = glm::scaling(&glm::vec3(0.05 * 0.6, 0.08 * 0.6, 0.0));
-                glium_text::draw(
-                    &text,
-                    state.text_system,
-                    &mut target,
-                    matrix_helpers::reach_inside_mat4(&matrix),
-                    (1.0, 1.0, 1.0, 1.0),
-                )
-                .unwrap();
-                */
 
                 // Finalize frame
                 target.finish().unwrap();

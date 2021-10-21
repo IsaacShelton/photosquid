@@ -320,12 +320,6 @@ impl FontTexture {
     }
 }
 
-/*impl glium::uniforms::AsUniformValue for FontTexture {
-    fn as_uniform_value(&self) -> glium::uniforms::UniformValue {
-        glium::uniforms::AsUniformValue::as_uniform_value(&self.texture)
-    }
-}*/
-
 impl TextSystem {
     /// Builds a new text system that must be used to build `TextDisplay` objects.
     pub fn new<F>(facade: &F) -> TextSystem

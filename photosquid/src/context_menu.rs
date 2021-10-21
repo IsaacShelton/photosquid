@@ -1,4 +1,4 @@
-use crate::{aabb::AABB, color::Color, matrix_helpers::reach_inside_mat4, render_ctx::RenderCtx};
+use crate::{aabb::AABB, color::Color, matrix_helpers::reach_inside_mat4, render_ctx::RenderCtx, text_helpers};
 use glium::glutin::event::MouseButton;
 use glium_text_rusttype::{FontTexture, TextDisplay, TextSystem};
 use nalgebra_glm as glm;
@@ -72,7 +72,8 @@ impl ContextMenu {
                 projection: reach_inside_mat4(ctx.projection),
                 rectangle_color: Into::<[f32; 4]>::into(self.background_color),
                 dimensions: [quad_dimensions.x, quad_dimensions.y],
-                height_scale: 1.0f32
+                height_scale: 1.0f32,
+                do_shadow: 1
             };
 
             let draw_parameters = glium::DrawParameters {
@@ -119,23 +120,10 @@ impl ContextMenuOption {
     }
 
     pub fn get_text_display(&mut self, text_system: &TextSystem, font: Rc<FontTexture>) -> &TextDisplay<Rc<FontTexture>> {
-        Self::get_or_make_display(&mut self.text_display, text_system, font, &self.friendly_name)
+        text_helpers::get_or_make_display(&mut self.text_display, text_system, font, &self.friendly_name)
     }
 
     pub fn get_shortcut_display(&mut self, text_system: &TextSystem, font: Rc<FontTexture>) -> &TextDisplay<Rc<FontTexture>> {
-        Self::get_or_make_display(&mut self.shortcut_display, text_system, font, &self.friendly_shortcut)
-    }
-
-    fn get_or_make_display<'a>(
-        persistent: &'a mut Option<TextDisplay<Rc<FontTexture>>>,
-        text_system: &TextSystem,
-        font: Rc<FontTexture>,
-        text: &str,
-    ) -> &'a TextDisplay<Rc<FontTexture>> {
-        if persistent.is_none() {
-            let text_display = TextDisplay::new(text_system, font, text);
-            *persistent = Some(text_display);
-        }
-        return persistent.as_ref().unwrap();
+        text_helpers::get_or_make_display(&mut self.shortcut_display, text_system, font, &self.friendly_shortcut)
     }
 }

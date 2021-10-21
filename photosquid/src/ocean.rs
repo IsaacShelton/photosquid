@@ -37,8 +37,8 @@ impl Ocean {
     }
 
     // Tries to find a squid/squid-limb underneath a point to select
-    pub fn try_select(&self, underneath: &glm::Vec2, camera: &glm::Vec2, existing_selections: &Vec<Selection>) -> TrySelectResult {
-        for (self_reference, value) in self.get_squids_newest() {
+    pub fn try_select(&mut self, underneath: &glm::Vec2, camera: &glm::Vec2, existing_selections: &Vec<Selection>) -> TrySelectResult {
+        for (self_reference, value) in self.get_squids_newest_mut() {
             if let Some(result) = value.try_select(underneath, camera, self_reference) {
                 if !selection_contains(existing_selections, self_reference) {
                     // Found selection to append-to/replace existing ones
@@ -66,16 +66,17 @@ impl Ocean {
         squids
     }
 
+    #[allow(dead_code)]
     pub fn get_squids_oldest<'a>(&'a self) -> Vec<(SquidRef, &'a Box<dyn Squid>)> {
         let mut squids: Vec<(SquidRef, &Box<dyn Squid>)> = self.squids.iter().collect();
-        squids.sort();
+        squids.sort_by(|a, b| a.cmp(b));
         squids
     }
 
     #[allow(dead_code)]
     pub fn get_squids_oldest_mut<'a>(&'a mut self) -> Vec<(SquidRef, &'a mut Box<dyn Squid>)> {
         let mut squids: Vec<(SquidRef, &mut Box<dyn Squid>)> = self.squids.iter_mut().collect();
-        squids.sort();
+        squids.sort_by(|a, b| a.cmp(b));
         squids
     }
 

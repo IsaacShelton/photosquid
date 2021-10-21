@@ -53,13 +53,19 @@ impl Color {
 }
 
 impl From<Color> for [f32; 4] {
-    fn from(color: Color) -> [f32; 4] {
+    fn from(color: Color) -> Self {
         [color.r, color.g, color.b, color.a]
     }
 }
 
+impl From<Color> for (f32, f32, f32, f32) {
+    fn from(color: Color) -> Self {
+        (color.r, color.g, color.b, color.a)
+    }
+}
+
 impl From<Color> for [u8; 4] {
-    fn from(color: Color) -> [u8; 4] {
+    fn from(color: Color) -> Self {
         [
             (color.r * 255.0) as u8,
             (color.g * 255.0) as u8,
@@ -70,13 +76,19 @@ impl From<Color> for [u8; 4] {
 }
 
 impl From<&Color> for [f32; 4] {
-    fn from(color: &Color) -> [f32; 4] {
+    fn from(color: &Color) -> Self {
         [color.r, color.g, color.b, color.a]
     }
 }
 
+impl From<&Color> for (f32, f32, f32, f32) {
+    fn from(color: &Color) -> Self {
+        (color.r, color.g, color.b, color.a)
+    }
+}
+
 impl From<&Color> for [u8; 4] {
-    fn from(color: &Color) -> [u8; 4] {
+    fn from(color: &Color) -> Self {
         [
             (color.r * 255.0) as u8,
             (color.g * 255.0) as u8,

@@ -16,3 +16,5 @@ slotmap = "1.0.6"
 palette = "0.6.0"
 glium_text_rusttype = { path = "../glium_text_rusttype" }
 rand = "0.7"
+# serde = { version = "1.0", features = ["derive"] }
+# bincode = "1.2.1"

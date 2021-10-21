@@ -42,6 +42,14 @@ where
         self.data = new;
         self.changed = Instant::now();
     }
+
+    pub fn manual_get_real<'a>(&'a mut self) -> &mut T {
+        &mut self.data
+    }
+
+    pub fn manual_get_previous<'a>(&'a mut self) -> &mut T {
+        &mut self.previous
+    }
 }
 
 // Since we cannot extend interpolation::Lerp, we must make our own trait

@@ -47,6 +47,13 @@ impl MeshXyz {
         Self::new(include_str!("_src_objs/shape/rect.obj"), &display)
     }
 
+    pub fn new_shape_triangle(display: &glium::Display, p1: glm::Vec2, p2: glm::Vec2, p3: glm::Vec2) -> Self {
+        // We disregard normals and don't do back-face culling, so this is okay
+        let shape = vec![Vertex { position: p1.into() }, Vertex { position: p2.into() }, Vertex { position: p3.into() }];
+
+        Self::from_vertices(&shape, display)
+    }
+
     pub fn render(&self, ctx: &mut RenderCtx, x: f32, y: f32, w_scale: f32, h_scale: f32, color: &Color) {
         let identity = glm::identity::<f32, 4>();
         let transformation = glm::translation(&glm::vec3(x, y, 0.0));

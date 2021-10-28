@@ -54,6 +54,10 @@ impl MeshXyz {
         Self::from_vertices(&shape, display)
     }
 
+    pub fn new_shape_circle(display: &Display) -> Self {
+        Self::new(include_str!("_src_objs/shape/circle.obj"), &display)
+    }
+
     pub fn render(&self, ctx: &mut RenderCtx, x: f32, y: f32, w_scale: f32, h_scale: f32, color: &Color) {
         let identity = glm::identity::<f32, 4>();
         let transformation = glm::translation(&glm::vec3(x, y, 0.0));

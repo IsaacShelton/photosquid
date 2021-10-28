@@ -30,9 +30,6 @@ impl Tool for Tri {
         }
 
         // Handle interaction
-        let ocean = &mut app.ocean;
-        let display = &app.display;
-
         match interaction {
             Interaction::Click {
                 button: MouseButton::Left,
@@ -40,13 +37,12 @@ impl Tool for Tri {
             } => {
                 let world_position = position - app.camera.get_animated();
                 let color = app.toolbox.color_picker.calculate_color();
-                ocean.squids.insert(Box::new(TriSquid::new(
+                app.insert(Box::new(TriSquid::new(
                     world_position + glm::vec2(0.0, -50.0),
                     world_position + glm::vec2(50.0, 50.0),
                     world_position + glm::vec2(-50.0, 50.0),
                     self.initial_rotation,
                     color,
-                    display,
                 )));
                 return Capture::AllowDrag;
             }

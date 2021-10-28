@@ -8,6 +8,7 @@ use crate::{
 use nalgebra_glm as glm;
 use slotmap::SlotMap;
 
+#[derive(Copy, Clone)]
 pub struct Selection {
     pub squid_id: SquidRef,
     pub limb_id: Option<SquidLimbRef>,
@@ -27,6 +28,7 @@ pub struct NewSelectionInfo {
 }
 
 // A world that objects (aka squids) live in
+#[derive(Clone)]
 pub struct Ocean {
     pub squids: SlotMap<SquidRef, Box<dyn Squid>>,
 }

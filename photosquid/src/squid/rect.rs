@@ -1,4 +1,4 @@
-use super::{Squid, SquidRef};
+use super::{Initiation, Squid, SquidRef};
 use crate::{
     accumulator::Accumulator,
     algorithm,
@@ -14,14 +14,14 @@ use crate::{
     squid,
     tool::{Capture, Interaction},
 };
-use glium::{glutin::event::MouseButton, Display};
+use glium::glutin::event::MouseButton;
 use nalgebra_glm as glm;
 use std::time::{Duration, Instant};
 
 pub struct Rect {
     data: Smooth<RectData>,
     created: Instant,
-    mesh: MeshXyz,
+    mesh: Option<MeshXyz>,
 
     // Tweaking parameters
     moving_corner: Option<CornerKind>,
@@ -86,7 +86,7 @@ fn get_corner_dependence(moving: CornerKind, dependent: CornerKind) -> CornerDep
 }
 
 impl Rect {
-    pub fn new(x: f32, y: f32, w: f32, h: f32, rotation: f32, color: Color, display: &Display) -> Self {
+    pub fn new(x: f32, y: f32, w: f32, h: f32, rotation: f32, color: Color) -> Self {
         let data = RectData {
             x,
             y,
@@ -99,7 +99,7 @@ impl Rect {
         Self {
             data: Smooth::new(data, Duration::from_millis(500)),
             created: Instant::now(),
-            mesh: MeshXyz::new_shape_square(display),
+            mesh: None,
             moving_corner: None,
             moving: false,
             rotating: false,
@@ -204,6 +204,10 @@ impl Squid for Rect {
         let _t = (Instant::now() - self.created).as_millis() as f32 / 1000.0;
         let RectData { x, y, w, h, rotation, color } = self.data.get_animated();
 
+        if self.mesh.is_none() {
+            self.mesh = Some(MeshXyz::new_shape_square(ctx.display));
+        }
+
         let transformation = glm::translation(&glm::vec3(x, y, 0.0));
         let transformation = glm::rotate(&transformation, rotation, &glm::vec3(0.0, 0.0, -1.0));
         let transformation = glm::scale(&transformation, &glm::vec3(w, h, 0.0));
@@ -215,7 +219,8 @@ impl Squid for Rect {
             color: Into::<[f32; 4]>::into(color)
         };
 
-        ctx.draw(&self.mesh.vertex_buffer, &self.mesh.indices, ctx.color_shader, &uniforms, &Default::default())
+        let mesh = self.mesh.as_ref().unwrap();
+        ctx.draw(&mesh.vertex_buffer, &mesh.indices, ctx.color_shader, &uniforms, &Default::default())
             .unwrap();
     }
 
@@ -364,20 +369,18 @@ impl Squid for Rect {
         self.data.set(new_data);
     }
 
-    fn duplicate(&self, offset: &glm::Vec2, display: &Display) -> Box<dyn Squid> {
+    fn duplicate(&self, offset: &glm::Vec2) -> Box<dyn Squid> {
         let real = self.data.get_real();
-        Box::new(Self::new(
-            real.x + offset.x,
-            real.y + offset.y,
-            real.w,
-            real.h,
-            real.rotation,
-            real.color,
-            display,
-        ))
+        Box::new(Self::new(real.x + offset.x, real.y + offset.y, real.w, real.h, real.rotation, real.color))
     }
 
     fn get_creation_time(&self) -> Instant {
         self.created
+    }
+
+    fn initiate(&mut self, initiation: Initiation) {
+        match initiation {
+            Initiation::TRANSLATION => self.moving = true,
+        }
     }
 }

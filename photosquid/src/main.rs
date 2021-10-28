@@ -33,8 +33,7 @@ use color_scheme::ColorScheme;
 use context_menu::ContextAction;
 use glium::{
     glutin::{
-        event::{ElementState, MouseButton, VirtualKeyCode},
-        event::{Event::WindowEvent as AbstractWindowEvent, WindowEvent as ConcreteWindowEvent},
+        event::{ElementState, Event::WindowEvent as AbstractWindowEvent, ModifiersState, MouseButton, VirtualKeyCode, WindowEvent as ConcreteWindowEvent},
         event_loop::{ControlFlow, EventLoop},
         window::WindowBuilder,
         ContextBuilder, GlProfile, GlRequest,
@@ -54,8 +53,7 @@ use std::{
     rc::Rc,
     time::{Duration, Instant},
 };
-use tool::{Capture, Interaction};
-use tool::{Tool, ToolKey};
+use tool::{Capture, Interaction, Tool, ToolKey};
 use tool_button::ToolButton;
 use toolbox::ToolBox;
 
@@ -118,6 +116,13 @@ fn main() {
             include_str!("_src_objs/triangle.obj"),
             Box::new(DeformPressAnimation {}),
             tools.insert(tool::Tri::new()),
+            &display,
+        ));
+
+        toolbox.add(ToolButton::new(
+            include_str!("_src_objs/circle.obj"),
+            Box::new(DeformPressAnimation {}),
+            tools.insert(tool::Circle::new()),
             &display,
         ));
 
@@ -212,6 +217,7 @@ fn main() {
         mouse_position: None,
         scale_factor,
         ocean: Ocean::new(),
+        history: History::new(),
         dimensions: None,
         projection: None,
         view: None,
@@ -220,11 +226,13 @@ fn main() {
         dragging: None,
         selections: vec![],
         keys_held: BTreeSet::new(),
+        modifiers_held: ModifiersState::empty(),
         text_system,
         font: Rc::new(font),
         context_menu: None,
         numeric_mappings,
         interaction_options: InteractionOptions::new(),
+        wait_for_stop_drag: false,
     };
 
     event_loop.run(move |abstract_event, _, control_flow| {
@@ -238,6 +246,12 @@ fn main() {
 
         fn do_click(state: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>, button: MouseButton) -> Capture {
             // Returns whether a drag is allowed to start
+
+            if state.wait_for_stop_drag {
+                state.wait_for_stop_drag = false;
+                state.dragging = None;
+                return Capture::NoDrag;
+            }
 
             let position = state.mouse_position.unwrap();
             let position = glm::vec2(position.x, position.y);
@@ -288,6 +302,9 @@ fn main() {
             }
 
             state.toolbox.mouse_release(button);
+
+            // Primitive history
+            state.add_history_marker();
         }
 
         fn do_drag(state: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>) -> Capture {
@@ -329,6 +346,7 @@ fn main() {
                         }
                     }
                 }
+                ConcreteWindowEvent::ModifiersChanged(value) => state.modifiers_held = value,
                 ConcreteWindowEvent::MouseInput {
                     state: element_state, button, ..
                 } => {
@@ -470,7 +488,9 @@ fn main() {
             if let Some(new_color) = state.toolbox.color_picker.poll() {
                 for selection in state.selections.iter() {
                     if selection.limb_id.is_none() {
-                        state.ocean.squids[selection.squid_id].set_color(new_color);
+                        if let Some(squid) = state.ocean.squids.get_mut(selection.squid_id) {
+                            squid.set_color(new_color);
+                        }
                     }
                 }
             }

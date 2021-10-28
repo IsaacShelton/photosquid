@@ -1,8 +1,9 @@
-use super::{Capture, Interaction, Tool};
+use super::{Capture, Interaction, KeyCapture, Tool};
 use crate::{
-    app::ApplicationState,
+    app::{ApplicationState, Dragging},
     ocean::{NewSelection, TrySelectResult},
     render_ctx::RenderCtx,
+    squid::Initiation,
     text_input::TextInput,
     tool,
 };
@@ -50,7 +51,7 @@ impl Tool for Pointer {
     fn interact(&mut self, interaction: Interaction, app: &mut ApplicationState) -> Capture {
         // Update options
         if let Some(new_content) = self.translation_snapping_input.poll() {
-            app.interaction_options.translation_snapping = new_content.parse::<f32>().unwrap_or_default().max(0.0);
+            app.interaction_options.translation_snapping = new_content.parse::<f32>().unwrap_or_default().max(1.0);
         }
 
         if let Some(new_content) = self.rotation_snapping_input.poll() {
@@ -81,6 +82,17 @@ impl Tool for Pointer {
                 if app.context_menu.is_some() {
                     return Capture::NoDrag;
                 }
+            }
+            Interaction::Key { virtual_keycode } => {
+                return match virtual_keycode {
+                    VirtualKeyCode::G => {
+                        app.initiate(Initiation::TRANSLATION);
+                        app.dragging = Some(Dragging::new(app.mouse_position.unwrap_or_default()));
+                        app.wait_for_stop_drag = true;
+                        Capture::Keyboard(KeyCapture::Capture)
+                    }
+                    _ => Capture::Miss,
+                };
             }
             _ => (),
         }

@@ -1,3 +1,4 @@
+mod circle;
 mod interaction;
 mod pan;
 mod pointer;
@@ -11,6 +12,7 @@ use nalgebra_glm as glm;
 use slotmap::new_key_type;
 use std::rc::Rc;
 
+pub use circle::Circle;
 pub use interaction::{Capture, Interaction, KeyCapture};
 pub use pan::Pan;
 pub use pointer::Pointer;

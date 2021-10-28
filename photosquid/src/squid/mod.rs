@@ -1,3 +1,4 @@
+pub mod circle;
 pub mod rect;
 pub mod tri;
 
@@ -10,7 +11,6 @@ use crate::{
     render_ctx::RenderCtx,
     tool::{Capture, Interaction},
 };
-use glium::Display;
 use nalgebra_glm as glm;
 use slotmap::new_key_type;
 use std::{
@@ -18,6 +18,7 @@ use std::{
     time::Instant,
 };
 
+pub use circle::Circle;
 pub use rect::Rect;
 pub use tri::Tri;
 
@@ -59,10 +60,13 @@ pub trait Squid {
     fn set_color(&mut self, color: Color);
 
     // Duplicates a squid
-    fn duplicate(&self, offset: &glm::Vec2, display: &Display) -> Box<dyn Squid>;
+    fn duplicate(&self, offset: &glm::Vec2) -> Box<dyn Squid>;
 
     // Gets the creation time of a squid (used for ordering)
     fn get_creation_time(&self) -> Instant;
+
+    // Signals to the squid to initiate a certain user action
+    fn initiate(&mut self, initiation: Initiation);
 }
 
 impl PartialOrd for dyn Squid {
@@ -83,6 +87,17 @@ impl Ord for dyn Squid {
     fn cmp(&self, other: &Self) -> Ordering {
         self.get_creation_time().cmp(&other.get_creation_time())
     }
+}
+
+impl Clone for Box<dyn Squid> {
+    fn clone(&self) -> Self {
+        self.duplicate(&glm::zero())
+    }
+}
+
+#[derive(Copy, Clone)]
+pub enum Initiation {
+    TRANSLATION,
 }
 
 const HANDLE_RADIUS: f32 = 8.0;

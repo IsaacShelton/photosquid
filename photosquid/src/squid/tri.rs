@@ -1,4 +1,4 @@
-use super::{Squid, SquidRef};
+use super::{Initiation, Squid, SquidRef};
 use crate::{
     accumulator::Accumulator,
     app::InteractionOptions,
@@ -20,7 +20,7 @@ use std::time::{Duration, Instant};
 pub struct Tri {
     data: Smooth<TriData>,
     created: Instant,
-    mesh: MeshXyz,
+    mesh: Option<MeshXyz>,
 
     // Keep track of which points the mesh is made of,
     // so that we know when we have to re-create it
@@ -61,13 +61,13 @@ impl Lerpable for TriData {
 }
 
 impl Tri {
-    pub fn new(p1: glm::Vec2, p2: glm::Vec2, p3: glm::Vec2, rotation: f32, color: Color, display: &Display) -> Self {
+    pub fn new(p1: glm::Vec2, p2: glm::Vec2, p3: glm::Vec2, rotation: f32, color: Color) -> Self {
         let data = TriData { p1, p2, p3, rotation, color };
 
         Self {
             data: Smooth::new(data, Duration::from_millis(500)),
             created: Instant::now(),
-            mesh: MeshXyz::new_shape_triangle(display, p1, p2, p3),
+            mesh: None,
             mesh_p1: p1,
             mesh_p2: p2,
             mesh_p3: p3,
@@ -83,10 +83,14 @@ impl Tri {
     fn refresh_mesh(&mut self, display: &Display) {
         let TriData { p1, p2, p3, .. } = self.data.get_animated();
 
-        if glm::distance2(&p1, &self.mesh_p1) > 1.0 || glm::distance2(&p2, &self.mesh_p2) > 1.0 || glm::distance2(&p3, &self.mesh_p3) > 1.0 {
+        if self.mesh.is_none()
+            || glm::distance2(&p1, &self.mesh_p1) > 1.0
+            || glm::distance2(&p2, &self.mesh_p2) > 1.0
+            || glm::distance2(&p3, &self.mesh_p3) > 1.0
+        {
             // Data points are far enough from existing mesh that we will need
             // to re-create it
-            self.mesh = MeshXyz::new_shape_triangle(display, p1, p2, p3);
+            self.mesh = Some(MeshXyz::new_shape_triangle(display, p1, p2, p3));
         }
     }
 
@@ -176,7 +180,7 @@ impl Tri {
         let mut p2 = glm::rotate_vec2(&(real.p2 - center), -rotation);
         let mut p3 = glm::rotate_vec2(&(real.p3 - center), -rotation);
 
-        let new_p = glm::rotate_vec2(&(mouse_position + camera - center), 0.0);
+        let new_p = glm::rotate_vec2(&(mouse_position - camera - center), 0.0);
 
         match self.moving_point {
             Some(0) => p1 = new_p,
@@ -287,8 +291,9 @@ impl Tri {
 impl Squid for Tri {
     // Renders squid in regular state
     fn render(&mut self, ctx: &mut RenderCtx) {
-        self.refresh_mesh(ctx.display);
         let TriData { rotation, color, .. } = self.data.get_animated();
+
+        self.refresh_mesh(ctx.display);
 
         let center = self.get_animated_center();
         let transformation = glm::translation(&glm::vec2_to_vec3(&center));
@@ -302,7 +307,8 @@ impl Squid for Tri {
             color: Into::<[f32; 4]>::into(color)
         };
 
-        ctx.draw(&self.mesh.vertex_buffer, &self.mesh.indices, ctx.color_shader, &uniforms, &Default::default())
+        let mesh = self.mesh.as_ref().unwrap();
+        ctx.draw(&mesh.vertex_buffer, &mesh.indices, ctx.color_shader, &uniforms, &Default::default())
             .unwrap();
     }
 
@@ -455,20 +461,19 @@ impl Squid for Tri {
     }
 
     // Duplicates a squid
-    fn duplicate(&self, offset: &glm::Vec2, display: &Display) -> Box<dyn Squid> {
+    fn duplicate(&self, offset: &glm::Vec2) -> Box<dyn Squid> {
         let real = self.data.get_real();
-        Box::new(Self::new(
-            real.p1 + offset,
-            real.p2 + offset,
-            real.p3 + offset,
-            real.rotation,
-            real.color,
-            display,
-        ))
+        Box::new(Self::new(real.p1 + offset, real.p2 + offset, real.p3 + offset, real.rotation, real.color))
     }
 
     // Gets the creation time of a squid (used for ordering)
     fn get_creation_time(&self) -> Instant {
         self.created
+    }
+
+    fn initiate(&mut self, initiation: Initiation) {
+        match initiation {
+            Initiation::TRANSLATION => self.moving = true,
+        }
     }
 }

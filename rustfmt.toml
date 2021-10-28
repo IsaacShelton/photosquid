@@ -1,2 +1,3 @@
 newline_style = "Unix"
 max_width = 160
+merge_imports = true

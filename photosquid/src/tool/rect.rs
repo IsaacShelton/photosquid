@@ -45,9 +45,6 @@ impl Tool for Rect {
         }
 
         // Handle interaction
-        let ocean = &mut app.ocean;
-        let display = &app.display;
-
         match interaction {
             Interaction::Click {
                 button: MouseButton::Left,
@@ -55,14 +52,13 @@ impl Tool for Rect {
             } => {
                 let world_position = position - app.camera.get_animated();
                 let color = app.toolbox.color_picker.calculate_color();
-                ocean.squids.insert(Box::new(RectSquid::new(
+                app.insert(Box::new(RectSquid::new(
                     world_position.x,
                     world_position.y,
                     self.initial_width,
                     self.initial_height,
                     self.initial_rotation,
                     color,
-                    display,
                 )));
                 return Capture::AllowDrag;
             }

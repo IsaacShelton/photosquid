@@ -95,7 +95,7 @@ impl Clone for Box<dyn Squid> {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Initiation {
     TRANSLATION,
 }
@@ -105,7 +105,8 @@ const HANDLE_RADIUS: f32 = 8.0;
 pub fn common_context_menu(underneath: &glm::Vec2, color_scheme: &ColorScheme) -> ContextMenu {
     let delete = ContextMenuOption::new("Delete".to_string(), "X".to_string(), ContextAction::DeleteSelected);
     let duplicate = ContextMenuOption::new("Duplicate".to_string(), "Shift+D".to_string(), ContextAction::DuplicateSelected);
-    let context_menu = ContextMenu::new(*underneath, vec![delete, duplicate], color_scheme.dark_ribbon);
+    let grab = ContextMenuOption::new("Grab".to_string(), "G".to_string(), ContextAction::GrabSelected);
+    let context_menu = ContextMenu::new(*underneath, vec![delete, duplicate, grab], color_scheme.dark_ribbon);
     context_menu
 }
 

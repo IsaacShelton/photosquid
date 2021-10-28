@@ -24,15 +24,18 @@ pub struct Circle {
 
     // Tweaking parameters
     moving: bool,
+    scale_rotating: bool,
     translation_accumulator: Accumulator<glm::Vec2>,
+    rotation_accumulator: Accumulator<f32>,
 }
 
 #[derive(Copy, Clone)]
-struct CircleData {
+pub struct CircleData {
     x: f32,
     y: f32,
     radius: f32,
     color: Color,
+    virtual_rotation: f32,
 }
 
 impl Lerpable for CircleData {
@@ -44,27 +47,70 @@ impl Lerpable for CircleData {
             y: interpolation::Lerp::lerp(&self.y, &other.y, scalar),
             radius: interpolation::Lerp::lerp(&self.radius, &other.radius, scalar),
             color: Lerpable::lerp(&self.color, &other.color, scalar),
+            virtual_rotation: interpolation::Lerp::lerp(&self.virtual_rotation, &other.virtual_rotation, scalar),
         }
     }
 }
 
 impl Circle {
     pub fn new(x: f32, y: f32, radius: f32, color: Color) -> Self {
-        let data = CircleData { x, y, radius, color };
+        let data = CircleData {
+            x,
+            y,
+            radius,
+            color,
+            virtual_rotation: 0.0,
+        };
+        Self::from_data(data)
+    }
 
+    pub fn from_data(data: CircleData) -> Self {
         Self {
             data: Smooth::new(data, Duration::from_millis(500)),
             created: Instant::now(),
             mesh: None,
             moving: false,
+            scale_rotating: false,
             translation_accumulator: Accumulator::new(),
+            rotation_accumulator: Accumulator::new(),
         }
+    }
+
+    pub fn get_rotate_handle_location(&self, camera: &glm::Vec2) -> glm::Vec2 {
+        let CircleData {
+            x,
+            y,
+            radius,
+            virtual_rotation,
+            ..
+        } = self.data.get_animated();
+        glm::vec2(x + camera.x + virtual_rotation.cos() * radius, y + camera.y - virtual_rotation.sin() * radius)
+    }
+
+    fn get_delta_rotation(&self, mouse_position: &glm::Vec2, camera: &glm::Vec2) -> f32 {
+        let real = self.data.get_real();
+        let screen_x = real.x + camera.x;
+        let screen_y = real.y + camera.y;
+
+        let old_rotation = real.virtual_rotation + self.rotation_accumulator.residue();
+        let new_rotation = -1.0 * (mouse_position.y - screen_y).atan2(mouse_position.x - screen_x);
+        return squid::angle_difference(old_rotation, new_rotation);
+    }
+
+    fn reposition_radius(&mut self, mouse: &glm::Vec2, camera: &glm::Vec2) {
+        let real_in_world = self.data.get_real();
+        let target_in_world = *mouse - camera;
+
+        let mut new_data = *real_in_world;
+        new_data.virtual_rotation += self.get_delta_rotation(mouse, camera);
+        new_data.radius = glm::distance(&glm::vec2(real_in_world.x, real_in_world.y), &target_in_world);
+        self.data.set(new_data);
     }
 }
 
 impl Squid for Circle {
     fn render(&mut self, ctx: &mut RenderCtx) {
-        let CircleData { x, y, radius, color } = self.data.get_animated();
+        let CircleData { x, y, radius, color, .. } = self.data.get_animated();
 
         if self.mesh.is_none() {
             self.mesh = Some(MeshXyz::new_shape_circle(ctx.display));
@@ -97,28 +143,51 @@ impl Squid for Circle {
             squid::HANDLE_RADIUS,
             &ctx.color_scheme.foreground,
         );
+
+        let handle_position = self.get_rotate_handle_location(ctx.camera);
+
+        ctx.ring_mesh.render(
+            ctx,
+            handle_position.x,
+            handle_position.y,
+            squid::HANDLE_RADIUS,
+            squid::HANDLE_RADIUS,
+            &ctx.color_scheme.foreground,
+        );
     }
 
     fn interact(&mut self, interaction: &Interaction, camera: &glm::Vec2, _options: &InteractionOptions) -> Capture {
         match interaction {
+            Interaction::PreClick => {
+                self.moving = false;
+                self.scale_rotating = false;
+            }
             Interaction::Click {
                 button: MouseButton::Left,
                 position,
             } => {
-                self.moving = false;
+                let rotate_handle_location = self.get_rotate_handle_location(camera);
+                if glm::distance(position, &rotate_handle_location) <= squid::HANDLE_RADIUS * 3.0 {
+                    self.scale_rotating = true;
+                    return Capture::AllowDrag;
+                }
 
                 if self.is_point_over(&position, camera) {
                     self.moving = true;
                     return Capture::AllowDrag;
                 }
             }
-            Interaction::Drag { delta, .. } => {
-                if self.moving {
+            Interaction::Drag { current, delta, .. } => {
+                if self.scale_rotating {
+                    // Since rotating and scaling at same time, it doesn't apply to others
+                    self.reposition_radius(current, camera);
+                } else if self.moving {
                     return Capture::MoveSelectedSquids { delta: *delta };
                 }
             }
             Interaction::MouseRelease { button: MouseButton::Left, .. } => {
                 self.translation_accumulator.clear();
+                self.rotation_accumulator.clear();
             }
             _ => (),
         }
@@ -135,7 +204,13 @@ impl Squid for Circle {
         }
     }
 
-    fn rotate(&mut self, _delta_theta: f32, _options: &InteractionOptions) {}
+    fn rotate(&mut self, raw_delta_theta: f32, options: &InteractionOptions) {
+        if let Some(delta_theta) = self.rotation_accumulator.accumulate(&raw_delta_theta, options.rotation_snapping) {
+            let mut new_data = *self.data.get_real();
+            new_data.virtual_rotation += delta_theta;
+            self.data.set(new_data);
+        }
+    }
 
     fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool {
         let real = self.data.get_real();
@@ -173,8 +248,10 @@ impl Squid for Circle {
     }
 
     fn duplicate(&self, offset: &glm::Vec2) -> Box<dyn Squid> {
-        let real = self.data.get_real();
-        Box::new(Self::new(real.x + offset.x, real.y + offset.y, real.radius, real.color))
+        let mut real = *self.data.get_real();
+        real.x += offset.x;
+        real.y += offset.y;
+        Box::new(Self::from_data(real))
     }
 
     fn get_creation_time(&self) -> Instant {

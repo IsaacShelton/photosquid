@@ -22,6 +22,7 @@ pub struct ContextMenuOption {
 pub enum ContextAction {
     DeleteSelected,
     DuplicateSelected,
+    GrabSelected,
 }
 
 impl ContextMenu {
@@ -37,7 +38,10 @@ impl ContextMenu {
         let area = self.get_area();
 
         if button == MouseButton::Left && area.intersecting_point(position.x, position.y) {
-            let option_index = ((position.y - self.position.y) / (area.height() / (self.options.len() as f32))) as usize;
+            let y_offset = 8.0f32 * 0.8;
+            let height_per_entry = 30.0f32;
+            let option_index = ((position.y - self.position.y + y_offset) / height_per_entry) as usize;
+            let option_index = option_index.clamp(0, self.options.len() - 1);
             Some(self.options[option_index].action)
         } else {
             None

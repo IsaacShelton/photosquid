@@ -38,7 +38,7 @@ pub struct Tri {
 }
 
 #[derive(Copy, Clone)]
-struct TriData {
+pub struct TriData {
     p1: glm::Vec2,
     p2: glm::Vec2,
     p3: glm::Vec2,
@@ -63,14 +63,17 @@ impl Lerpable for TriData {
 impl Tri {
     pub fn new(p1: glm::Vec2, p2: glm::Vec2, p3: glm::Vec2, rotation: f32, color: Color) -> Self {
         let data = TriData { p1, p2, p3, rotation, color };
+        Self::from_data(data)
+    }
 
+    pub fn from_data(data: TriData) -> Self {
         Self {
             data: Smooth::new(data, Duration::from_millis(500)),
             created: Instant::now(),
             mesh: None,
-            mesh_p1: p1,
-            mesh_p2: p2,
-            mesh_p3: p3,
+            mesh_p1: data.p1,
+            mesh_p2: data.p2,
+            mesh_p3: data.p3,
             moving_point: None,
             moving: false,
             rotating: false,
@@ -350,14 +353,15 @@ impl Squid for Tri {
     // Returns if and how the interaction was captured
     fn interact(&mut self, interaction: &Interaction, camera: &glm::Vec2, _options: &InteractionOptions) -> Capture {
         match interaction {
+            Interaction::PreClick => {
+                self.moving = false;
+                self.rotating = false;
+                self.moving_point = None;
+            }
             Interaction::Click {
                 button: MouseButton::Left,
                 position,
             } => {
-                self.moving = false;
-                self.rotating = false;
-                self.moving_point = None;
-
                 for (i, corner) in self.get_animated_screen_points(camera).iter().enumerate() {
                     if glm::distance(position, &corner) <= squid::HANDLE_RADIUS * 2.0 {
                         self.moving_point = Some(i);
@@ -366,7 +370,7 @@ impl Squid for Tri {
                 }
 
                 let rotate_handle_location = self.get_rotate_handle_location(camera);
-                if glm::distance(position, &rotate_handle_location) <= squid::HANDLE_RADIUS * 3.0 {
+                if glm::distance(position, &rotate_handle_location) <= squid::HANDLE_RADIUS * 2.0 {
                     self.rotating = true;
                     return Capture::AllowDrag;
                 }
@@ -388,7 +392,6 @@ impl Squid for Tri {
                 }
             }
             Interaction::MouseRelease { button: MouseButton::Left, .. } => {
-                self.rotating = false;
                 self.translation_accumulator.clear();
                 self.rotation_accumulator.clear();
             }
@@ -462,8 +465,11 @@ impl Squid for Tri {
 
     // Duplicates a squid
     fn duplicate(&self, offset: &glm::Vec2) -> Box<dyn Squid> {
-        let real = self.data.get_real();
-        Box::new(Self::new(real.p1 + offset, real.p2 + offset, real.p3 + offset, real.rotation, real.color))
+        let mut real = *self.data.get_real();
+        real.p1 += offset;
+        real.p2 += offset;
+        real.p3 += offset;
+        Box::new(Self::from_data(real))
     }
 
     // Gets the creation time of a squid (used for ordering)

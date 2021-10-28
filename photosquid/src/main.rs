@@ -48,6 +48,7 @@ use press_animation::*;
 use render_ctx::RenderCtx;
 use slotmap::SlotMap;
 use smooth::Smooth;
+use squid::Initiation;
 use std::{
     collections::{btree_set::BTreeSet, HashMap},
     rc::Rc,
@@ -264,12 +265,9 @@ fn main() {
                 if let Some(action) = action {
                     // Handle action
                     match action {
-                        ContextAction::DeleteSelected => {
-                            state.delete_selected();
-                        }
-                        ContextAction::DuplicateSelected => {
-                            state.duplicate_selected();
-                        }
+                        ContextAction::DeleteSelected => state.delete_selected(),
+                        ContextAction::DuplicateSelected => state.duplicate_selected(),
+                        ContextAction::GrabSelected => state.initiate(Initiation::TRANSLATION),
                     }
                     return Capture::NoDrag;
                 }
@@ -360,7 +358,10 @@ fn main() {
                         }
                     } else {
                         do_mouse_release(&mut state, button);
-                        state.dragging = None;
+
+                        if !state.wait_for_stop_drag {
+                            state.dragging = None;
+                        }
                     }
                 }
                 ConcreteWindowEvent::CursorMoved { position, .. } => {

@@ -92,6 +92,12 @@ impl ControlOrCommand for ModifiersState {
 impl ApplicationState {
     // Tries to interact with any already selected squids
     // Returns whether interaction was captured
+    pub fn preclick(&mut self) {
+        for (_, squid) in self.ocean.squids.iter_mut() {
+            squid.interact(&Interaction::PreClick, &self.camera.get_animated(), &self.interaction_options);
+        }
+    }
+
     pub fn try_interact_with_selections(&mut self, interaction: &Interaction) -> Capture {
         for (reference, squid) in self.ocean.get_squids_newest_mut() {
             if selection_contains(&self.selections, reference) {
@@ -201,6 +207,11 @@ impl ApplicationState {
     }
 
     pub fn initiate(&mut self, initiation: Initiation) {
+        if initiation == Initiation::TRANSLATION {
+            self.dragging = Some(Dragging::new(self.mouse_position.unwrap_or_default()));
+            self.wait_for_stop_drag = true;
+        }
+
         for squid_id in self.get_selected_squids() {
             if let Some(squid) = self.ocean.squids.get_mut(squid_id) {
                 squid.initiate(initiation);

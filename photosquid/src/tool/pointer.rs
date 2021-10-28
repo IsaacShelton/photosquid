@@ -1,6 +1,6 @@
 use super::{Capture, Interaction, KeyCapture, Tool};
 use crate::{
-    app::{ApplicationState, Dragging},
+    app::ApplicationState,
     ocean::{NewSelection, TrySelectResult},
     render_ctx::RenderCtx,
     squid::Initiation,
@@ -58,6 +58,12 @@ impl Tool for Pointer {
             app.interaction_options.rotation_snapping = new_content.parse::<f32>().unwrap_or_default().max(0.0) * std::f32::consts::PI / 180.0;
         }
 
+        // Pre-notify all squids of incoming click if applicable
+        // (used for resetting internal states)
+        if let Interaction::Click { .. } = interaction {
+            app.preclick();
+        }
+
         // First off
         // If we can interact with existing selections, prefer that over selecting different objects
         app.try_interact_with_selections(&interaction)?;
@@ -87,8 +93,6 @@ impl Tool for Pointer {
                 return match virtual_keycode {
                     VirtualKeyCode::G => {
                         app.initiate(Initiation::TRANSLATION);
-                        app.dragging = Some(Dragging::new(app.mouse_position.unwrap_or_default()));
-                        app.wait_for_stop_drag = true;
                         Capture::Keyboard(KeyCapture::Capture)
                     }
                     _ => Capture::Miss,

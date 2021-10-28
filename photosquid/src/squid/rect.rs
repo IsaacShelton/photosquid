@@ -32,7 +32,7 @@ pub struct Rect {
 }
 
 #[derive(Copy, Clone)]
-struct RectData {
+pub struct RectData {
     x: f32,
     y: f32,
     w: f32,
@@ -96,6 +96,10 @@ impl Rect {
             color,
         };
 
+        Self::from_data(data)
+    }
+
+    pub fn from_data(data: RectData) -> Self {
         Self {
             data: Smooth::new(data, Duration::from_millis(500)),
             created: Instant::now(),
@@ -262,14 +266,15 @@ impl Squid for Rect {
 
     fn interact(&mut self, interaction: &Interaction, camera: &glm::Vec2, _options: &InteractionOptions) -> Capture {
         match interaction {
+            Interaction::PreClick => {
+                self.moving = false;
+                self.rotating = false;
+                self.moving_corner = None;
+            }
             Interaction::Click {
                 button: MouseButton::Left,
                 position,
             } => {
-                self.moving = false;
-                self.rotating = false;
-                self.moving_corner = None;
-
                 for (i, corner) in self.get_screen_corners(camera).iter().enumerate() {
                     if glm::distance(position, &corner) <= squid::HANDLE_RADIUS * 2.0 {
                         self.moving_corner = Some(Self::get_corner_kind(i));
@@ -278,7 +283,7 @@ impl Squid for Rect {
                 }
 
                 let rotate_handle_location = self.get_rotate_handle_location(camera);
-                if glm::distance(position, &rotate_handle_location) <= squid::HANDLE_RADIUS * 3.0 {
+                if glm::distance(position, &rotate_handle_location) <= squid::HANDLE_RADIUS * 2.0 {
                     self.rotating = true;
                     return Capture::AllowDrag;
                 }
@@ -300,7 +305,6 @@ impl Squid for Rect {
                 }
             }
             Interaction::MouseRelease { button: MouseButton::Left, .. } => {
-                self.rotating = false;
                 self.moving_corner = None;
                 self.translation_accumulator.clear();
                 self.rotation_accumulator.clear();
@@ -370,8 +374,10 @@ impl Squid for Rect {
     }
 
     fn duplicate(&self, offset: &glm::Vec2) -> Box<dyn Squid> {
-        let real = self.data.get_real();
-        Box::new(Self::new(real.x + offset.x, real.y + offset.y, real.w, real.h, real.rotation, real.color))
+        let mut real = *self.data.get_real();
+        real.x += offset.x;
+        real.y += offset.y;
+        Box::new(Self::from_data(real))
     }
 
     fn get_creation_time(&self) -> Instant {

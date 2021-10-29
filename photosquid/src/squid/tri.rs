@@ -480,6 +480,11 @@ impl Squid for Tri {
     fn initiate(&mut self, initiation: Initiation) {
         match initiation {
             Initiation::TRANSLATION => self.moving = true,
+            Initiation::ROTATION => (),
         }
+    }
+
+    fn get_center(&self) -> glm::Vec2 {
+        self.get_animated_center()
     }
 }

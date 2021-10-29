@@ -57,6 +57,8 @@ pub struct ApplicationState {
     pub numeric_mappings: HashMap<VirtualKeyCode, char>,
     pub interaction_options: InteractionOptions,
     pub wait_for_stop_drag: bool,
+    pub global_rotate_point: Option<glm::Vec2>,
+    pub global_rotation: f32,
 }
 
 pub struct InteractionOptions {
@@ -207,9 +209,24 @@ impl ApplicationState {
     }
 
     pub fn initiate(&mut self, initiation: Initiation) {
-        if initiation == Initiation::TRANSLATION {
-            self.dragging = Some(Dragging::new(self.mouse_position.unwrap_or_default()));
-            self.wait_for_stop_drag = true;
+        match initiation {
+            Initiation::TRANSLATION | Initiation::ROTATION => {
+                self.dragging = Some(Dragging::new(self.mouse_position.unwrap_or_default()));
+                self.wait_for_stop_drag = true;
+            }
+        }
+
+        match initiation {
+            Initiation::ROTATION => {
+                let mouse = self.mouse_position.unwrap();
+                let camera = self.camera.get_animated();
+                let position = glm::vec2(mouse.x, mouse.y) - camera;
+                if let Some(rotate_point) = self.get_closest_selection_center(&position) {
+                    self.global_rotate_point = Some(rotate_point + camera);
+                    self.global_rotation = (rotate_point.y - position.y).atan2(position.x - rotate_point.x) - std::f32::consts::FRAC_PI_2;
+                }
+            }
+            _ => (),
         }
 
         for squid_id in self.get_selected_squids() {
@@ -217,6 +234,21 @@ impl ApplicationState {
                 squid.initiate(initiation);
             }
         }
+    }
+
+    pub fn get_closest_selection_center(&self, position: &glm::Vec2) -> Option<glm::Vec2> {
+        let mut least_distance = f32::INFINITY;
+        let mut closest_center: Option<glm::Vec2> = None;
+        for (_, squid) in self.ocean.squids.iter() {
+            let center = squid.get_center();
+            let distance = glm::distance(position, &center);
+
+            if distance < least_distance {
+                least_distance = distance;
+                closest_center = Some(center);
+            }
+        }
+        closest_center
     }
 
     pub fn add_history_marker(&mut self) {

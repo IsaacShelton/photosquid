@@ -3,7 +3,7 @@ use crate::{
     app::ApplicationState,
     ocean::{NewSelection, TrySelectResult},
     render_ctx::RenderCtx,
-    squid::Initiation,
+    squid::{self, Initiation},
     text_input::TextInput,
     tool,
 };
@@ -64,6 +64,14 @@ impl Tool for Pointer {
             app.preclick();
         }
 
+        if let Interaction::Drag { current, .. } = interaction {
+            if let Some(global_rotate_point) = app.global_rotate_point {
+                let delta_theta = squid::get_point_delta_rotation(&global_rotate_point, &current, app.global_rotation) - std::f32::consts::FRAC_PI_2;
+                app.global_rotation += delta_theta;
+                return Capture::RotateSelectedSquids { delta_theta };
+            }
+        }
+
         // First off
         // If we can interact with existing selections, prefer that over selecting different objects
         app.try_interact_with_selections(&interaction)?;
@@ -93,6 +101,10 @@ impl Tool for Pointer {
                 return match virtual_keycode {
                     VirtualKeyCode::G => {
                         app.initiate(Initiation::TRANSLATION);
+                        Capture::Keyboard(KeyCapture::Capture)
+                    }
+                    VirtualKeyCode::R => {
+                        app.initiate(Initiation::ROTATION);
                         Capture::Keyboard(KeyCapture::Capture)
                     }
                     _ => Capture::Miss,

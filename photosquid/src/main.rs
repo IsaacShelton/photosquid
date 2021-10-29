@@ -234,6 +234,8 @@ fn main() {
         numeric_mappings,
         interaction_options: InteractionOptions::new(),
         wait_for_stop_drag: false,
+        global_rotate_point: None,
+        global_rotation: 0.0,
     };
 
     event_loop.run(move |abstract_event, _, control_flow| {
@@ -251,6 +253,7 @@ fn main() {
             if state.wait_for_stop_drag {
                 state.wait_for_stop_drag = false;
                 state.dragging = None;
+                state.global_rotate_point = None;
                 return Capture::NoDrag;
             }
 
@@ -268,6 +271,7 @@ fn main() {
                         ContextAction::DeleteSelected => state.delete_selected(),
                         ContextAction::DuplicateSelected => state.duplicate_selected(),
                         ContextAction::GrabSelected => state.initiate(Initiation::TRANSLATION),
+                        ContextAction::RotateSelected => state.initiate(Initiation::ROTATION),
                     }
                     return Capture::NoDrag;
                 }

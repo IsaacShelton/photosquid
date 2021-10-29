@@ -261,6 +261,12 @@ impl Squid for Circle {
     fn initiate(&mut self, initiation: Initiation) {
         match initiation {
             Initiation::TRANSLATION => self.moving = true,
+            Initiation::ROTATION => (),
         }
+    }
+
+    fn get_center(&self) -> glm::Vec2 {
+        let CircleData { x, y, .. } = self.data.get_animated();
+        glm::vec2(x, y)
     }
 }

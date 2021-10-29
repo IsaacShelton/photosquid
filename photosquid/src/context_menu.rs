@@ -23,6 +23,7 @@ pub enum ContextAction {
     DeleteSelected,
     DuplicateSelected,
     GrabSelected,
+    RotateSelected,
 }
 
 impl ContextMenu {

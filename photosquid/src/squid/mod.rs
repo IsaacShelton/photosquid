@@ -67,6 +67,9 @@ pub trait Squid {
 
     // Signals to the squid to initiate a certain user action
     fn initiate(&mut self, initiation: Initiation);
+
+    // Gets center of a squid
+    fn get_center(&self) -> glm::Vec2;
 }
 
 impl PartialOrd for dyn Squid {
@@ -98,6 +101,7 @@ impl Clone for Box<dyn Squid> {
 #[derive(Copy, Clone, PartialEq)]
 pub enum Initiation {
     TRANSLATION,
+    ROTATION,
 }
 
 const HANDLE_RADIUS: f32 = 8.0;
@@ -106,7 +110,8 @@ pub fn common_context_menu(underneath: &glm::Vec2, color_scheme: &ColorScheme) -
     let delete = ContextMenuOption::new("Delete".to_string(), "X".to_string(), ContextAction::DeleteSelected);
     let duplicate = ContextMenuOption::new("Duplicate".to_string(), "Shift+D".to_string(), ContextAction::DuplicateSelected);
     let grab = ContextMenuOption::new("Grab".to_string(), "G".to_string(), ContextAction::GrabSelected);
-    let context_menu = ContextMenu::new(*underneath, vec![delete, duplicate, grab], color_scheme.dark_ribbon);
+    let rotate = ContextMenuOption::new("Rotate".to_string(), "R".to_string(), ContextAction::RotateSelected);
+    let context_menu = ContextMenu::new(*underneath, vec![delete, duplicate, grab, rotate], color_scheme.dark_ribbon);
     context_menu
 }
 
@@ -114,4 +119,9 @@ pub fn angle_difference(alpha: f32, beta: f32) -> f32 {
     use std::f32::consts::{PI, TAU};
     let difference = (beta - alpha + PI) % TAU - PI;
     return if difference < -PI { difference + TAU } else { difference };
+}
+
+pub fn get_point_delta_rotation(screen_position: &glm::Vec2, mouse_position: &glm::Vec2, old_rotation: f32) -> f32 {
+    let new_rotation = -1.0 * (mouse_position.y - screen_position.y).atan2(mouse_position.x - screen_position.x);
+    return angle_difference(old_rotation, new_rotation);
 }

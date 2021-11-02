@@ -35,6 +35,7 @@ pub struct Tri {
     translation_accumulator: Accumulator<glm::Vec2>,
     rotation_accumulator: Accumulator<f32>,
     virtual_rotation: f32, // Rotation that only applies to the handle
+    prescale_size: [glm::Vec2; 3],
 }
 
 #[derive(Copy, Clone)]
@@ -67,6 +68,8 @@ impl Tri {
     }
 
     pub fn from_data(data: TriData) -> Self {
+        let center = Self::get_center(&data.p1, &data.p2, &data.p3);
+
         Self {
             data: Smooth::new(data, Duration::from_millis(500)),
             created: Instant::now(),
@@ -80,6 +83,7 @@ impl Tri {
             translation_accumulator: Accumulator::new(),
             rotation_accumulator: Accumulator::new(),
             virtual_rotation: 0.0,
+            prescale_size: [data.p1 - center, data.p2 - center, data.p3 - center],
         }
     }
 
@@ -292,7 +296,6 @@ impl Tri {
 }
 
 impl Squid for Tri {
-    // Renders squid in regular state
     fn render(&mut self, ctx: &mut RenderCtx) {
         let TriData { rotation, color, .. } = self.data.get_animated();
 
@@ -315,8 +318,6 @@ impl Squid for Tri {
             .unwrap();
     }
 
-    // Render additional selection indicators and helpers for when
-    // the squid is selected
     fn render_selected_indication(&self, ctx: &mut RenderCtx) {
         let camera = ctx.camera;
         let TriData { .. } = self.data.get_animated();
@@ -348,9 +349,6 @@ impl Squid for Tri {
         }
     }
 
-    // Called when squid is selected and has opportunity to capture
-    // user interaction
-    // Returns if and how the interaction was captured
     fn interact(&mut self, interaction: &Interaction, camera: &glm::Vec2, _options: &InteractionOptions) -> Capture {
         match interaction {
             Interaction::PreClick => {
@@ -400,7 +398,6 @@ impl Squid for Tri {
         Capture::Miss
     }
 
-    // Returns whether a point is over this squid
     fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool {
         let real = self.data.get_real();
         let center = self.get_real_center();
@@ -410,7 +407,6 @@ impl Squid for Tri {
         Self::is_point_inside_triangle(underneath, &p1, &p2, &p3)
     }
 
-    // Moves a squid body
     fn translate(&mut self, raw_delta: &glm::Vec2, options: &InteractionOptions) {
         if let Some(delta) = self.translation_accumulator.accumulate(raw_delta, options.translation_snapping) {
             let mut new_data = *self.data.get_real();
@@ -421,7 +417,6 @@ impl Squid for Tri {
         }
     }
 
-    // Rotates a squid body
     fn rotate(&mut self, raw_delta_theta: f32, options: &InteractionOptions) {
         if let Some(delta_theta) = self.rotation_accumulator.accumulate(&raw_delta_theta, options.rotation_snapping) {
             let mut new_data = *self.data.get_real();
@@ -430,8 +425,15 @@ impl Squid for Tri {
         }
     }
 
-    // Attempts to get a selection for this squid or a selection for a limb of this squid
-    // under the point (x, y)
+    fn scale(&mut self, total_scale_factor: f32, _options: &InteractionOptions) {
+        let center = self.get_real_center();
+        let mut new_data = *self.data.get_real();
+        new_data.p1 = (self.prescale_size[0] * total_scale_factor) + center;
+        new_data.p2 = (self.prescale_size[1] * total_scale_factor) + center;
+        new_data.p3 = (self.prescale_size[2] * total_scale_factor) + center;
+        self.data.set(new_data);
+    }
+
     fn try_select(&mut self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection> {
         if self.is_point_over(underneath, camera) {
             self.moving = true;
@@ -447,7 +449,6 @@ impl Squid for Tri {
         }
     }
 
-    // Attempt to get a context menu for if a quid is underneath a point
     fn try_context_menu(&self, underneath: &glm::Vec2, camera: &glm::Vec2, _self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu> {
         if self.is_point_over(underneath, camera) {
             Some(squid::common_context_menu(underneath, color_scheme))
@@ -456,14 +457,12 @@ impl Squid for Tri {
         }
     }
 
-    // Attempts to set the color of a squid
     fn set_color(&mut self, color: Color) {
         let mut new_data = *self.data.get_real();
         new_data.color = color;
         self.data.set(new_data);
     }
 
-    // Duplicates a squid
     fn duplicate(&self, offset: &glm::Vec2) -> Box<dyn Squid> {
         let mut real = *self.data.get_real();
         real.p1 += offset;
@@ -472,15 +471,19 @@ impl Squid for Tri {
         Box::new(Self::from_data(real))
     }
 
-    // Gets the creation time of a squid (used for ordering)
     fn get_creation_time(&self) -> Instant {
         self.created
     }
 
     fn initiate(&mut self, initiation: Initiation) {
         match initiation {
-            Initiation::TRANSLATION => self.moving = true,
-            Initiation::ROTATION => (),
+            Initiation::Translation => self.moving = true,
+            Initiation::Rotation => (),
+            Initiation::Scale => {
+                let real = self.data.get_real();
+                let center = self.get_real_center();
+                self.prescale_size = [real.p1 - center, real.p2 - center, real.p3 - center];
+            }
         }
     }
 

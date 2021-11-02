@@ -27,6 +27,7 @@ pub struct Circle {
     scale_rotating: bool,
     translation_accumulator: Accumulator<glm::Vec2>,
     rotation_accumulator: Accumulator<f32>,
+    prescale_size: f32,
 }
 
 #[derive(Copy, Clone)]
@@ -73,6 +74,7 @@ impl Circle {
             scale_rotating: false,
             translation_accumulator: Accumulator::new(),
             rotation_accumulator: Accumulator::new(),
+            prescale_size: data.radius,
         }
     }
 
@@ -212,6 +214,12 @@ impl Squid for Circle {
         }
     }
 
+    fn scale(&mut self, total_scale_factor: f32, _options: &InteractionOptions) {
+        let mut new_data = *self.data.get_real();
+        new_data.radius = self.prescale_size * total_scale_factor;
+        self.data.set(new_data);
+    }
+
     fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool {
         let real = self.data.get_real();
         let position = glm::vec2(real.x, real.y) + camera;
@@ -260,8 +268,9 @@ impl Squid for Circle {
 
     fn initiate(&mut self, initiation: Initiation) {
         match initiation {
-            Initiation::TRANSLATION => self.moving = true,
-            Initiation::ROTATION => (),
+            Initiation::Translation => self.moving = true,
+            Initiation::Rotation => (),
+            Initiation::Scale => self.prescale_size = self.data.get_real().radius,
         }
     }
 

@@ -29,6 +29,7 @@ pub struct Rect {
     rotating: bool,
     translation_accumulator: Accumulator<glm::Vec2>,
     rotation_accumulator: Accumulator<f32>,
+    prescale_size: glm::Vec2,
 }
 
 #[derive(Copy, Clone)]
@@ -109,6 +110,7 @@ impl Rect {
             rotating: false,
             translation_accumulator: Accumulator::new(),
             rotation_accumulator: Accumulator::new(),
+            prescale_size: glm::vec2(data.w, data.h),
         }
     }
 
@@ -332,6 +334,13 @@ impl Squid for Rect {
         }
     }
 
+    fn scale(&mut self, total_scale_factor: f32, _options: &InteractionOptions) {
+        let mut new_data = *self.data.get_real();
+        new_data.w = total_scale_factor * self.prescale_size.x;
+        new_data.h = total_scale_factor * self.prescale_size.y;
+        self.data.set(new_data);
+    }
+
     fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool {
         let real = self.data.get_real();
         let corners: Vec<glm::Vec2> = self
@@ -386,8 +395,12 @@ impl Squid for Rect {
 
     fn initiate(&mut self, initiation: Initiation) {
         match initiation {
-            Initiation::TRANSLATION => self.moving = true,
-            Initiation::ROTATION => (),
+            Initiation::Translation => self.moving = true,
+            Initiation::Rotation => (),
+            Initiation::Scale => {
+                let real = self.data.get_real();
+                self.prescale_size = glm::vec2(real.w, real.h);
+            }
         }
     }
 

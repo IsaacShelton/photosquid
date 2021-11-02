@@ -18,6 +18,7 @@ pub enum Capture {
     Keyboard(KeyCapture),
     MoveSelectedSquids { delta: glm::Vec2 },
     RotateSelectedSquids { delta_theta: f32 },
+    ScaleSelectedSquids { total_scale_factor: f32 },
 }
 
 #[derive(Debug, PartialEq)]

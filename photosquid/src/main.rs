@@ -234,8 +234,7 @@ fn main() {
         numeric_mappings,
         interaction_options: InteractionOptions::new(),
         wait_for_stop_drag: false,
-        global_rotate_point: None,
-        global_rotation: 0.0,
+        operation: None,
     };
 
     event_loop.run(move |abstract_event, _, control_flow| {
@@ -253,7 +252,7 @@ fn main() {
             if state.wait_for_stop_drag {
                 state.wait_for_stop_drag = false;
                 state.dragging = None;
-                state.global_rotate_point = None;
+                state.operation = None;
                 return Capture::NoDrag;
             }
 
@@ -270,8 +269,9 @@ fn main() {
                     match action {
                         ContextAction::DeleteSelected => state.delete_selected(),
                         ContextAction::DuplicateSelected => state.duplicate_selected(),
-                        ContextAction::GrabSelected => state.initiate(Initiation::TRANSLATION),
-                        ContextAction::RotateSelected => state.initiate(Initiation::ROTATION),
+                        ContextAction::GrabSelected => state.initiate(Initiation::Translation),
+                        ContextAction::RotateSelected => state.initiate(Initiation::Rotation),
+                        ContextAction::ScaleSelected => state.initiate(Initiation::Scale),
                     }
                     return Capture::NoDrag;
                 }

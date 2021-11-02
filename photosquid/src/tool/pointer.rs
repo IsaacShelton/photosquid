@@ -1,6 +1,6 @@
 use super::{Capture, Interaction, KeyCapture, Tool};
 use crate::{
-    app::ApplicationState,
+    app::{ApplicationState, Operation},
     ocean::{NewSelection, TrySelectResult},
     render_ctx::RenderCtx,
     squid::{self, Initiation},
@@ -65,10 +65,19 @@ impl Tool for Pointer {
         }
 
         if let Interaction::Drag { current, .. } = interaction {
-            if let Some(global_rotate_point) = app.global_rotate_point {
-                let delta_theta = squid::get_point_delta_rotation(&global_rotate_point, &current, app.global_rotation) - std::f32::consts::FRAC_PI_2;
-                app.global_rotation += delta_theta;
-                return Capture::RotateSelectedSquids { delta_theta };
+            match &mut app.operation {
+                Some(Operation::Rotation { point, rotation }) => {
+                    let delta_theta = squid::get_point_delta_rotation(point, &current, *rotation) - std::f32::consts::FRAC_PI_2;
+                    *rotation += delta_theta;
+                    return Capture::RotateSelectedSquids { delta_theta };
+                }
+                Some(Operation::Scale { origin, point }) => {
+                    let d0 = glm::distance(origin, point);
+                    let df = glm::distance(origin, &current);
+                    let total_scale_factor = df / d0;
+                    return Capture::ScaleSelectedSquids { total_scale_factor };
+                }
+                None => (),
             }
         }
 
@@ -100,11 +109,15 @@ impl Tool for Pointer {
             Interaction::Key { virtual_keycode } => {
                 return match virtual_keycode {
                     VirtualKeyCode::G => {
-                        app.initiate(Initiation::TRANSLATION);
+                        app.initiate(Initiation::Translation);
                         Capture::Keyboard(KeyCapture::Capture)
                     }
                     VirtualKeyCode::R => {
-                        app.initiate(Initiation::ROTATION);
+                        app.initiate(Initiation::Rotation);
+                        Capture::Keyboard(KeyCapture::Capture)
+                    }
+                    VirtualKeyCode::S => {
+                        app.initiate(Initiation::Scale);
                         Capture::Keyboard(KeyCapture::Capture)
                     }
                     _ => Capture::Miss,

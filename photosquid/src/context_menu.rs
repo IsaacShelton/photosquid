@@ -24,6 +24,7 @@ pub enum ContextAction {
     DuplicateSelected,
     GrabSelected,
     RotateSelected,
+    ScaleSelected,
 }
 
 impl ContextMenu {

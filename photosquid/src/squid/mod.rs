@@ -49,6 +49,9 @@ pub trait Squid {
     // Rotates a squid body
     fn rotate(&mut self, delta_theta: f32, options: &InteractionOptions);
 
+    // Scales a squid body
+    fn scale(&mut self, total_scale_factor: f32, options: &InteractionOptions);
+
     // Attempts to get a selection for this squid or a selection for a limb of this squid
     // under the point (x, y)
     fn try_select(&mut self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection>;
@@ -100,8 +103,9 @@ impl Clone for Box<dyn Squid> {
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum Initiation {
-    TRANSLATION,
-    ROTATION,
+    Translation,
+    Rotation,
+    Scale,
 }
 
 const HANDLE_RADIUS: f32 = 8.0;
@@ -111,7 +115,8 @@ pub fn common_context_menu(underneath: &glm::Vec2, color_scheme: &ColorScheme) -
     let duplicate = ContextMenuOption::new("Duplicate".to_string(), "Shift+D".to_string(), ContextAction::DuplicateSelected);
     let grab = ContextMenuOption::new("Grab".to_string(), "G".to_string(), ContextAction::GrabSelected);
     let rotate = ContextMenuOption::new("Rotate".to_string(), "R".to_string(), ContextAction::RotateSelected);
-    let context_menu = ContextMenu::new(*underneath, vec![delete, duplicate, grab, rotate], color_scheme.dark_ribbon);
+    let scale = ContextMenuOption::new("Scale".to_string(), "S".to_string(), ContextAction::ScaleSelected);
+    let context_menu = ContextMenu::new(*underneath, vec![delete, duplicate, grab, rotate, scale], color_scheme.dark_ribbon);
     context_menu
 }
 

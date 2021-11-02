@@ -57,8 +57,12 @@ pub struct ApplicationState {
     pub numeric_mappings: HashMap<VirtualKeyCode, char>,
     pub interaction_options: InteractionOptions,
     pub wait_for_stop_drag: bool,
-    pub global_rotate_point: Option<glm::Vec2>,
-    pub global_rotation: f32,
+    pub operation: Option<Operation>,
+}
+
+pub enum Operation {
+    Rotation { point: glm::Vec2, rotation: f32 },
+    Scale { point: glm::Vec2, origin: glm::Vec2 },
 }
 
 pub struct InteractionOptions {
@@ -177,6 +181,13 @@ impl ApplicationState {
                     }
                 }
             }
+            Capture::ScaleSelectedSquids { total_scale_factor } => {
+                for squid_id in self.get_selected_squids() {
+                    if let Some(squid) = self.ocean.squids.get_mut(squid_id) {
+                        squid.scale(*total_scale_factor, &self.interaction_options);
+                    }
+                }
+            }
         }
     }
 
@@ -209,21 +220,28 @@ impl ApplicationState {
     }
 
     pub fn initiate(&mut self, initiation: Initiation) {
-        match initiation {
-            Initiation::TRANSLATION | Initiation::ROTATION => {
-                self.dragging = Some(Dragging::new(self.mouse_position.unwrap_or_default()));
-                self.wait_for_stop_drag = true;
-            }
-        }
+        self.dragging = Some(Dragging::new(self.mouse_position.unwrap_or_default()));
+        self.wait_for_stop_drag = true;
 
         match initiation {
-            Initiation::ROTATION => {
+            Initiation::Rotation => {
                 let mouse = self.mouse_position.unwrap();
                 let camera = self.camera.get_animated();
                 let position = glm::vec2(mouse.x, mouse.y) - camera;
+
                 if let Some(rotate_point) = self.get_closest_selection_center(&position) {
-                    self.global_rotate_point = Some(rotate_point + camera);
-                    self.global_rotation = (rotate_point.y - position.y).atan2(position.x - rotate_point.x) - std::f32::consts::FRAC_PI_2;
+                    let point = rotate_point + camera;
+                    let rotation = (rotate_point.y - position.y).atan2(position.x - rotate_point.x) - std::f32::consts::FRAC_PI_2;
+                    self.operation = Some(Operation::Rotation { point, rotation });
+                }
+            }
+            Initiation::Scale => {
+                let mouse = self.mouse_position.unwrap();
+                let camera = self.camera.get_animated();
+                let point = glm::vec2(mouse.x, mouse.y) - camera;
+
+                if let Some(origin) = self.get_closest_selection_center(&point) {
+                    self.operation = Some(Operation::Scale { point, origin });
                 }
             }
             _ => (),

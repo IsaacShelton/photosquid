@@ -1,11 +1,4 @@
-use crate::{
-    aabb::AABB,
-    color::Color,
-    matrix_helpers::reach_inside_mat4,
-    render_ctx::RenderCtx,
-    smooth::Smooth,
-    tool::{Capture, Interaction},
-};
+use crate::{aabb::AABB, capture::Capture, color::Color, interaction::Interaction, matrix_helpers::reach_inside_mat4, render_ctx::RenderCtx, smooth::Smooth};
 use glium::glutin::event::MouseButton;
 use nalgebra_glm as glm;
 use std::time::Duration;
@@ -16,6 +9,7 @@ pub struct ColorPicker {
     hue_value_point: Smooth<glm::Vec2>,
     saturation_point: Smooth<f32>,
     color_changed_to: Option<Color>,
+    y: f32,
 }
 
 impl ColorPicker {
@@ -26,6 +20,7 @@ impl ColorPicker {
             hue_value_point: Smooth::new(glm::vec2(0.0, 0.0), Duration::from_millis(200)),
             saturation_point: Smooth::new(1.0, Duration::from_millis(200)),
             color_changed_to: None,
+            y: 64.0,
         }
     }
 
@@ -94,7 +89,7 @@ impl ColorPicker {
     }
 
     pub fn get_hue_value_area(&self, screen_width: f32) -> Option<AABB> {
-        Some(AABB::new(screen_width - 256.0, 64.0, 256.0, 192.0))
+        Some(AABB::new(screen_width - 256.0, self.y, 256.0, 192.0))
     }
 
     pub fn get_hue_value_point(&self) -> &Smooth<glm::Vec2> {
@@ -102,7 +97,7 @@ impl ColorPicker {
     }
 
     pub fn get_saturation_area(&self, screen_width: f32) -> Option<AABB> {
-        Some(AABB::new(screen_width - 256.0, 260.0, 256.0, 24.0))
+        Some(AABB::new(screen_width - 256.0, self.y + 196.0, 256.0, 24.0))
     }
 
     pub fn get_saturation_point(&self) -> &Smooth<f32> {

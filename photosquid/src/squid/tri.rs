@@ -2,22 +2,24 @@ use super::{Initiation, Squid, SquidRef};
 use crate::{
     accumulator::Accumulator,
     app::InteractionOptions,
+    capture::Capture,
     color::Color,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
+    interaction::Interaction,
     matrix_helpers::reach_inside_mat4,
     mesh::MeshXyz,
     ocean::{NewSelection, NewSelectionInfo, Selection},
     render_ctx::RenderCtx,
     smooth::{Lerpable, Smooth},
     squid,
-    tool::{Capture, Interaction},
 };
 use glium::{glutin::event::MouseButton, Display};
 use nalgebra_glm as glm;
 use std::time::{Duration, Instant};
 
 pub struct Tri {
+    name: Option<String>,
     data: Smooth<TriData>,
     created: Instant,
     mesh: Option<MeshXyz>,
@@ -71,6 +73,7 @@ impl Tri {
         let center = Self::get_center(&data.p1, &data.p2, &data.p3);
 
         Self {
+            name: None,
             data: Smooth::new(data, Duration::from_millis(500)),
             created: Instant::now(),
             mesh: None,
@@ -390,6 +393,8 @@ impl Squid for Tri {
                 }
             }
             Interaction::MouseRelease { button: MouseButton::Left, .. } => {
+                self.rotating = false;
+                self.moving_point = None;
                 self.translation_accumulator.clear();
                 self.rotation_accumulator.clear();
             }
@@ -434,10 +439,8 @@ impl Squid for Tri {
         self.data.set(new_data);
     }
 
-    fn try_select(&mut self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection> {
+    fn try_select(&self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection> {
         if self.is_point_over(underneath, camera) {
-            self.moving = true;
-
             Some(NewSelection {
                 selection: Selection::new(self_reference, None),
                 info: NewSelectionInfo {
@@ -447,6 +450,10 @@ impl Squid for Tri {
         } else {
             None
         }
+    }
+
+    fn select(&mut self) {
+        self.moving = true;
     }
 
     fn try_context_menu(&self, underneath: &glm::Vec2, camera: &glm::Vec2, _self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu> {
@@ -477,7 +484,10 @@ impl Squid for Tri {
 
     fn initiate(&mut self, initiation: Initiation) {
         match initiation {
-            Initiation::Translation => self.moving = true,
+            Initiation::Translation => {
+                self.moving = true;
+                self.moving_point = None;
+            }
             Initiation::Rotation => (),
             Initiation::Scale => {
                 let real = self.data.get_real();
@@ -489,5 +499,22 @@ impl Squid for Tri {
 
     fn get_center(&self) -> glm::Vec2 {
         self.get_animated_center()
+    }
+
+    fn get_name<'a>(&'a self) -> &'a str {
+        if let Some(name) = &self.name {
+            name
+        } else {
+            "Unnamed Triangle"
+        }
+    }
+
+    fn set_name(&mut self, name: String) {
+        self.name = Some(name);
+    }
+
+    fn get_opaque_handles(&self) -> Vec<glm::Vec2> {
+        let data = self.data.get_animated();
+        vec![data.p1, data.p2, data.p3, self.get_rotate_handle_location(&glm::zero())]
     }
 }

@@ -1,11 +1,17 @@
 mod circle;
-mod interaction;
 mod pan;
 mod pointer;
 mod rect;
 mod tri;
 
-use crate::{aabb::AABB, app::ApplicationState, render_ctx::RenderCtx, text_input::TextInput};
+use crate::{
+    aabb::AABB,
+    app::ApplicationState,
+    capture::{Capture, KeyCapture},
+    interaction::Interaction,
+    render_ctx::RenderCtx,
+    text_input::TextInput,
+};
 use glium::glutin::event::VirtualKeyCode;
 use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;
@@ -13,7 +19,6 @@ use slotmap::new_key_type;
 use std::rc::Rc;
 
 pub use circle::Circle;
-pub use interaction::{Capture, Interaction, KeyCapture};
 pub use pan::Pan;
 pub use pointer::Pointer;
 pub use rect::Rect;

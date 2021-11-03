@@ -3,22 +3,24 @@ use crate::{
     accumulator::Accumulator,
     algorithm,
     app::InteractionOptions,
+    capture::Capture,
     color::Color,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
+    interaction::Interaction,
     matrix_helpers::reach_inside_mat4,
     mesh::MeshXyz,
     ocean::{NewSelection, NewSelectionInfo, Selection},
     render_ctx::RenderCtx,
     smooth::{Lerpable, Smooth},
     squid,
-    tool::{Capture, Interaction},
 };
 use glium::glutin::event::MouseButton;
 use nalgebra_glm as glm;
 use std::time::{Duration, Instant};
 
 pub struct Rect {
+    name: Option<String>,
     data: Smooth<RectData>,
     created: Instant,
     mesh: Option<MeshXyz>,
@@ -102,6 +104,7 @@ impl Rect {
 
     pub fn from_data(data: RectData) -> Self {
         Self {
+            name: None,
             data: Smooth::new(data, Duration::from_millis(500)),
             created: Instant::now(),
             mesh: None,
@@ -130,6 +133,12 @@ impl Rect {
             .map(|&p| glm::vec2(p.0 * w / 2.0, p.1 * h / 2.0))
             .map(|p| glm::rotate_vec2(&p, -1.0 * rotation))
             .collect()
+    }
+
+    fn get_world_corners(&self) -> Vec<glm::Vec2> {
+        let RectData { x, y, .. } = self.data.get_animated();
+
+        self.get_relative_corners().iter().map(|p| glm::vec2(p.x + x, p.y + y)).collect()
     }
 
     fn get_screen_corners(&self, camera: &glm::Vec2) -> Vec<glm::Vec2> {
@@ -307,6 +316,7 @@ impl Squid for Rect {
                 }
             }
             Interaction::MouseRelease { button: MouseButton::Left, .. } => {
+                self.rotating = false;
                 self.moving_corner = None;
                 self.translation_accumulator.clear();
                 self.rotation_accumulator.clear();
@@ -353,10 +363,8 @@ impl Squid for Rect {
         algorithm::is_point_inside_rectangle(corners[0], corners[1], corners[2], corners[3], *underneath)
     }
 
-    fn try_select(&mut self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection> {
+    fn try_select(&self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection> {
         if self.is_point_over(underneath, camera) {
-            self.moving = true;
-
             Some(NewSelection {
                 selection: Selection::new(self_reference, None),
                 info: NewSelectionInfo {
@@ -366,6 +374,10 @@ impl Squid for Rect {
         } else {
             None
         }
+    }
+
+    fn select(&mut self) {
+        self.moving = true;
     }
 
     fn try_context_menu(&self, underneath: &glm::Vec2, camera: &glm::Vec2, _self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu> {
@@ -395,7 +407,10 @@ impl Squid for Rect {
 
     fn initiate(&mut self, initiation: Initiation) {
         match initiation {
-            Initiation::Translation => self.moving = true,
+            Initiation::Translation => {
+                self.moving = true;
+                self.moving_corner = None;
+            }
             Initiation::Rotation => (),
             Initiation::Scale => {
                 let real = self.data.get_real();
@@ -407,5 +422,23 @@ impl Squid for Rect {
     fn get_center(&self) -> glm::Vec2 {
         let RectData { x, y, .. } = self.data.get_animated();
         glm::vec2(x, y)
+    }
+
+    fn get_name<'a>(&'a self) -> &'a str {
+        if let Some(name) = &self.name {
+            name
+        } else {
+            "Unnamed Rect"
+        }
+    }
+
+    fn set_name(&mut self, name: String) {
+        self.name = Some(name);
+    }
+
+    fn get_opaque_handles(&self) -> Vec<glm::Vec2> {
+        let mut all_handles = self.get_world_corners();
+        all_handles.push(self.get_rotate_handle_location(&glm::zero()));
+        all_handles
     }
 }

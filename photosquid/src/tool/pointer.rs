@@ -25,8 +25,13 @@ impl Pointer {
         })
     }
 
-    pub fn try_select(&self, position: &glm::Vec2, app: &mut ApplicationState) {
-        match app.ocean.try_select(&position, &app.camera.get_animated(), &app.selections) {
+    #[must_use]
+    pub fn try_select(&self, position: &glm::Vec2, app: &mut ApplicationState) -> TrySelectResult {
+        app.ocean.try_select(&position, &app.camera.get_animated(), &app.selections)
+    }
+
+    fn handle_try_select_result(result: TrySelectResult, app: &mut ApplicationState) {
+        match result {
             TrySelectResult::New(NewSelection { selection, info }) => {
                 // Clear existing selection unless holding shift
                 if !app.keys_held.contains(&VirtualKeyCode::LShift) {
@@ -39,6 +44,10 @@ impl Pointer {
                 // Notify UI of changes
                 if let Some(its_color) = info.color {
                     app.toolbox.color_picker.set_selected_color_no_notif(its_color);
+                }
+
+                if let Some(squid) = app.ocean.get_mut(selection.squid_id) {
+                    squid.select();
                 }
             }
             TrySelectResult::Preserve => (),
@@ -73,7 +82,7 @@ impl Tool for Pointer {
                 }
                 Some(Operation::Scale { origin, point }) => {
                     let d0 = glm::distance(origin, point);
-                    let df = glm::distance(origin, &current);
+                    let df = glm::distance(origin, &(current - app.camera.get_animated()));
                     let total_scale_factor = df / d0;
                     return Capture::ScaleSelectedSquids { total_scale_factor };
                 }
@@ -81,25 +90,38 @@ impl Tool for Pointer {
             }
         }
 
+        let mouse = if let Some(position) = app.mouse_position {
+            glm::vec2(position.x, position.y)
+        } else {
+            glm::zero()
+        };
+        let possible_selection = self.try_select(&mouse, app);
+
         // First off
         // If we can interact with existing selections, prefer that over selecting different objects
-        app.try_interact_with_selections(&interaction)?;
+        if if let Interaction::Click { .. } = interaction {
+            match possible_selection {
+                TrySelectResult::New { .. } => false,
+                _ => true,
+            }
+        } else {
+            true
+        } {
+            app.try_interact_with_selections(&interaction)?;
+        }
 
         // Otherwise, If we can't interact with the existing selections, then try to select/de-select if applicable
         match interaction {
-            Interaction::Click {
-                button: MouseButton::Left,
-                position,
-            } => {
+            Interaction::Click { button: MouseButton::Left, .. } => {
                 // Left Click - Try to select
-                self.try_select(&position, app);
+                Self::handle_try_select_result(possible_selection, app);
             }
             Interaction::Click {
                 button: MouseButton::Right,
                 position,
             } => {
                 // Right Click - Try to open context menu
-                self.try_select(&position, app);
+                Self::handle_try_select_result(self.try_select(&position, app), app);
                 app.context_menu = app.ocean.try_context_menu(&position, &app.camera.get_animated(), &app.color_scheme);
 
                 if app.context_menu.is_some() {

@@ -1,5 +1,6 @@
-use super::{Capture, Interaction, Tool};
-use crate::{app::ApplicationState, render_ctx::RenderCtx, squid::Tri as TriSquid, text_input::TextInput, tool};
+use crate::{
+    app::ApplicationState, capture::Capture, interaction::Interaction, render_ctx::RenderCtx, squid::Tri as TriSquid, text_input::TextInput, tool, tool::Tool,
+};
 use glium::glutin::event::MouseButton;
 use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;

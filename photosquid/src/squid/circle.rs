@@ -2,22 +2,24 @@ use super::{Initiation, Squid, SquidRef};
 use crate::{
     accumulator::Accumulator,
     app::InteractionOptions,
+    capture::Capture,
     color::Color,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
+    interaction::Interaction,
     matrix_helpers::reach_inside_mat4,
     mesh::MeshXyz,
     ocean::{NewSelection, NewSelectionInfo, Selection},
     render_ctx::RenderCtx,
     smooth::{Lerpable, Smooth},
     squid,
-    tool::{Capture, Interaction},
 };
 use glium::glutin::event::MouseButton;
 use nalgebra_glm as glm;
 use std::time::{Duration, Instant};
 
 pub struct Circle {
+    name: Option<String>,
     data: Smooth<CircleData>,
     created: Instant,
     mesh: Option<MeshXyz>,
@@ -67,6 +69,7 @@ impl Circle {
 
     pub fn from_data(data: CircleData) -> Self {
         Self {
+            name: None,
             data: Smooth::new(data, Duration::from_millis(500)),
             created: Instant::now(),
             mesh: None,
@@ -188,6 +191,7 @@ impl Squid for Circle {
                 }
             }
             Interaction::MouseRelease { button: MouseButton::Left, .. } => {
+                self.scale_rotating = false;
                 self.translation_accumulator.clear();
                 self.rotation_accumulator.clear();
             }
@@ -226,10 +230,8 @@ impl Squid for Circle {
         glm::distance(&position, underneath) < real.radius
     }
 
-    fn try_select(&mut self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection> {
+    fn try_select(&self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection> {
         if self.is_point_over(underneath, camera) {
-            self.moving = true;
-
             Some(NewSelection {
                 selection: Selection::new(self_reference, None),
                 info: NewSelectionInfo {
@@ -239,6 +241,10 @@ impl Squid for Circle {
         } else {
             None
         }
+    }
+
+    fn select(&mut self) {
+        self.moving = true;
     }
 
     fn try_context_menu(&self, underneath: &glm::Vec2, camera: &glm::Vec2, _self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu> {
@@ -277,5 +283,21 @@ impl Squid for Circle {
     fn get_center(&self) -> glm::Vec2 {
         let CircleData { x, y, .. } = self.data.get_animated();
         glm::vec2(x, y)
+    }
+
+    fn get_name<'a>(&'a self) -> &'a str {
+        if let Some(name) = &self.name {
+            name
+        } else {
+            "Unnamed Circle"
+        }
+    }
+
+    fn set_name(&mut self, name: String) {
+        self.name = Some(name);
+    }
+
+    fn get_opaque_handles(&self) -> Vec<glm::Vec2> {
+        vec![self.get_rotate_handle_location(&glm::zero())]
     }
 }

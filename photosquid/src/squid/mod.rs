@@ -4,12 +4,13 @@ pub mod tri;
 
 use crate::{
     app::InteractionOptions,
+    capture::Capture,
     color::Color,
     color_scheme::ColorScheme,
     context_menu::{ContextAction, ContextMenu, ContextMenuOption},
+    interaction::Interaction,
     ocean::NewSelection,
     render_ctx::RenderCtx,
-    tool::{Capture, Interaction},
 };
 use nalgebra_glm as glm;
 use slotmap::new_key_type;
@@ -54,7 +55,10 @@ pub trait Squid {
 
     // Attempts to get a selection for this squid or a selection for a limb of this squid
     // under the point (x, y)
-    fn try_select(&mut self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection>;
+    fn try_select(&self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection>;
+
+    // Performs selection
+    fn select(&mut self);
 
     // Attempt to get a context menu for if a quid is underneath a point
     fn try_context_menu(&self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu>;
@@ -73,6 +77,13 @@ pub trait Squid {
 
     // Gets center of a squid
     fn get_center(&self) -> glm::Vec2;
+
+    // Opaque name getter/setter
+    fn get_name<'a>(&'a self) -> &'a str;
+    fn set_name(&mut self, name: String);
+
+    // Returns the world positions of all "opaque" handles (aka handles that will take priority over new selections)
+    fn get_opaque_handles(&self) -> Vec<glm::Vec2>;
 }
 
 impl PartialOrd for dyn Squid {
@@ -108,7 +119,7 @@ pub enum Initiation {
     Scale,
 }
 
-const HANDLE_RADIUS: f32 = 8.0;
+pub const HANDLE_RADIUS: f32 = 8.0;
 
 pub fn common_context_menu(underneath: &glm::Vec2, color_scheme: &ColorScheme) -> ContextMenu {
     let delete = ContextMenuOption::new("Delete".to_string(), "X".to_string(), ContextAction::DeleteSelected);

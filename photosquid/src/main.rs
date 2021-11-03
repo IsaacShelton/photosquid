@@ -4,15 +4,19 @@ mod aabb;
 mod accumulator;
 mod algorithm;
 mod app;
+mod capture;
 mod color;
 mod color_impls;
-mod color_picker;
 mod color_scheme;
 mod context_menu;
+mod icon_button;
+mod interaction;
+mod layer;
 mod matrix_helpers;
 mod mesh;
 mod obj_helpers;
 mod ocean;
+mod options;
 mod press_animation;
 mod render_ctx;
 mod shader_helpers;
@@ -28,6 +32,7 @@ mod vertex;
 const TARGET_FPS: u64 = 60;
 
 use app::*;
+use capture::Capture;
 use color::Color;
 use color_scheme::ColorScheme;
 use context_menu::ContextAction;
@@ -41,21 +46,20 @@ use glium::{
     Display,
 };
 use glium_text_rusttype as glium_text;
+use interaction::Interaction;
 use mesh::{MeshXyz, MeshXyzUv};
 use nalgebra_glm as glm;
 use ocean::Ocean;
-use press_animation::*;
 use render_ctx::RenderCtx;
 use slotmap::SlotMap;
 use smooth::Smooth;
-use squid::Initiation;
+use squid::{Initiation, SquidRef};
 use std::{
     collections::{btree_set::BTreeSet, HashMap},
     rc::Rc,
     time::{Duration, Instant},
 };
-use tool::{Capture, Interaction, Tool, ToolKey};
-use tool_button::ToolButton;
+use tool::{Tool, ToolKey};
 use toolbox::ToolBox;
 
 fn main() {
@@ -89,47 +93,11 @@ fn main() {
     // Build toolbox
     let mut toolbox = ToolBox::new(&display);
     let mut tools: SlotMap<ToolKey, Box<dyn Tool>> = SlotMap::with_key();
+    let mut options_tabs: SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>> = SlotMap::with_key();
 
-    // Create tools and corresponding tool buttons
-    {
-        toolbox.add(ToolButton::new(
-            include_str!("_src_objs/pointer.obj"),
-            Box::new(DeformPressAnimation {}),
-            tools.insert(tool::Pointer::new()),
-            &display,
-        ));
-
-        toolbox.add(ToolButton::new(
-            include_str!("_src_objs/pan.obj"),
-            Box::new(DeformPressAnimation {}),
-            tools.insert(tool::Pan::new()),
-            &display,
-        ));
-
-        toolbox.add(ToolButton::new(
-            include_str!("_src_objs/rectangle.obj"),
-            Box::new(DeformPressAnimation {}),
-            tools.insert(tool::Rect::new()),
-            &display,
-        ));
-
-        toolbox.add(ToolButton::new(
-            include_str!("_src_objs/triangle.obj"),
-            Box::new(DeformPressAnimation {}),
-            tools.insert(tool::Tri::new()),
-            &display,
-        ));
-
-        toolbox.add(ToolButton::new(
-            include_str!("_src_objs/circle.obj"),
-            Box::new(DeformPressAnimation {}),
-            tools.insert(tool::Circle::new()),
-            &display,
-        ));
-
-        // Select first tool
-        toolbox.select(0);
-    }
+    // Create standard tool set
+    toolbox.create_standard_tools(&mut tools, &display);
+    toolbox.create_standard_options_tabs(&mut options_tabs, &display);
 
     let ribbon_mesh = MeshXyz::new_ui_rect(&display);
     let ring_mesh = MeshXyz::new_ui_ring(&display);
@@ -298,9 +266,12 @@ fn main() {
             let position = state.mouse_position.unwrap();
             let position = glm::vec2(position.x, position.y);
             let animated_camera = state.camera.get_animated();
+            let unordered_squids: Vec<SquidRef> = state.ocean.get_squids_unordered().collect();
 
-            for (_, squid) in state.ocean.squids.iter_mut() {
-                squid.interact(&Interaction::MouseRelease { position, button }, &animated_camera, &state.interaction_options);
+            for reference in unordered_squids {
+                if let Some(squid) = state.ocean.get_mut(reference) {
+                    squid.interact(&Interaction::MouseRelease { position, button }, &animated_camera, &state.interaction_options);
+                }
             }
 
             state.toolbox.mouse_release(button);
@@ -433,13 +404,15 @@ fn main() {
                 {
                     ctx.clear_color(&state.color_scheme.background);
 
-                    for (_, squid) in state.ocean.get_squids_oldest_mut() {
-                        squid.render(&mut ctx);
-                    }
+                    let lowest_squids: Vec<SquidRef> = state.ocean.get_squids_lowest().collect();
 
-                    for (reference, squid) in state.ocean.get_squids_oldest_mut() {
-                        if selection_contains(&state.selections, reference) {
-                            squid.render_selected_indication(&mut ctx);
+                    for reference in lowest_squids.iter() {
+                        if let Some(squid) = state.ocean.get_mut(*reference) {
+                            squid.render(&mut ctx);
+
+                            if selection_contains(&state.selections, *reference) {
+                                squid.render_selected_indication(&mut ctx);
+                            }
                         }
                     }
 
@@ -484,16 +457,16 @@ fn main() {
             _ => (),
         }
 
-        let (_, height) = state.dimensions.unwrap();
+        let (width, height) = state.dimensions.unwrap();
 
         // Update components
         {
-            state.toolbox.update(height);
+            state.toolbox.update(width, height);
 
             if let Some(new_color) = state.toolbox.color_picker.poll() {
                 for selection in state.selections.iter() {
                     if selection.limb_id.is_none() {
-                        if let Some(squid) = state.ocean.squids.get_mut(selection.squid_id) {
+                        if let Some(squid) = state.ocean.get_mut(selection.squid_id) {
                             squid.set_color(new_color);
                         }
                     }

@@ -1,13 +1,12 @@
 use crate::{
     aabb::AABB,
+    capture::{Capture, KeyCapture},
     matrix_helpers::reach_inside_mat4,
     render_ctx::RenderCtx,
     text_helpers,
-    tool::{Capture, KeyCapture},
 };
 use glium::glutin::event::{MouseButton, VirtualKeyCode};
-use glium_text_rusttype::TextSystem;
-use glium_text_rusttype::{FontTexture, TextDisplay};
+use glium_text_rusttype::{FontTexture, TextDisplay, TextSystem};
 use nalgebra_glm as glm;
 use std::{collections::HashMap, rc::Rc};
 

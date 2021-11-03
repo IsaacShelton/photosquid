@@ -1,11 +1,13 @@
 use crate::{
+    capture::Capture,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
+    interaction::Interaction,
     mesh::{MeshXyz, MeshXyzUv},
     ocean::{Ocean, Selection},
     smooth::Smooth,
     squid::{Initiation, Squid, SquidRef},
-    tool::{Capture, Interaction, Tool, ToolKey},
+    tool::{Tool, ToolKey},
     toolbox::ToolBox,
 };
 use glium::{
@@ -99,15 +101,23 @@ impl ApplicationState {
     // Tries to interact with any already selected squids
     // Returns whether interaction was captured
     pub fn preclick(&mut self) {
-        for (_, squid) in self.ocean.squids.iter_mut() {
-            squid.interact(&Interaction::PreClick, &self.camera.get_animated(), &self.interaction_options);
+        let unordered_squids: Vec<SquidRef> = self.ocean.get_squids_unordered().collect();
+
+        for reference in unordered_squids {
+            if let Some(squid) = self.ocean.get_mut(reference) {
+                squid.interact(&Interaction::PreClick, &self.camera.get_animated(), &self.interaction_options);
+            }
         }
     }
 
     pub fn try_interact_with_selections(&mut self, interaction: &Interaction) -> Capture {
-        for (reference, squid) in self.ocean.get_squids_newest_mut() {
+        let highest_squids: Vec<SquidRef> = self.ocean.get_squids_unordered().collect();
+
+        for reference in highest_squids {
             if selection_contains(&self.selections, reference) {
-                squid.interact(interaction, &self.camera.get_animated(), &self.interaction_options)?;
+                if let Some(squid) = self.ocean.get_mut(reference) {
+                    squid.interact(interaction, &self.camera.get_animated(), &self.interaction_options)?;
+                }
             }
         }
 
@@ -135,16 +145,16 @@ impl ApplicationState {
         }
 
         match key {
-            VirtualKeyCode::Key1 => self.toolbox.select(0),
-            VirtualKeyCode::Key2 => self.toolbox.select(1),
-            VirtualKeyCode::Key3 => self.toolbox.select(2),
-            VirtualKeyCode::Key4 => self.toolbox.select(3),
-            VirtualKeyCode::Key5 => self.toolbox.select(4),
-            VirtualKeyCode::Key6 => self.toolbox.select(5),
-            VirtualKeyCode::Key7 => self.toolbox.select(6),
-            VirtualKeyCode::Key8 => self.toolbox.select(7),
-            VirtualKeyCode::Key9 => self.toolbox.select(8),
-            VirtualKeyCode::Key0 => self.toolbox.select(9),
+            VirtualKeyCode::Key1 => self.toolbox.select_tool(0),
+            VirtualKeyCode::Key2 => self.toolbox.select_tool(1),
+            VirtualKeyCode::Key3 => self.toolbox.select_tool(2),
+            VirtualKeyCode::Key4 => self.toolbox.select_tool(3),
+            VirtualKeyCode::Key5 => self.toolbox.select_tool(4),
+            VirtualKeyCode::Key6 => self.toolbox.select_tool(5),
+            VirtualKeyCode::Key7 => self.toolbox.select_tool(6),
+            VirtualKeyCode::Key8 => self.toolbox.select_tool(7),
+            VirtualKeyCode::Key9 => self.toolbox.select_tool(8),
+            VirtualKeyCode::Key0 => self.toolbox.select_tool(9),
             VirtualKeyCode::X => self.delete_selected(),
             VirtualKeyCode::Escape => self.context_menu = None,
             VirtualKeyCode::D => {
@@ -169,21 +179,21 @@ impl ApplicationState {
             Capture::Keyboard(..) => (),
             Capture::MoveSelectedSquids { delta } => {
                 for squid_id in self.get_selected_squids() {
-                    if let Some(squid) = self.ocean.squids.get_mut(squid_id) {
+                    if let Some(squid) = self.ocean.get_mut(squid_id) {
                         squid.translate(&delta, &self.interaction_options);
                     }
                 }
             }
             Capture::RotateSelectedSquids { delta_theta } => {
                 for squid_id in self.get_selected_squids() {
-                    if let Some(squid) = self.ocean.squids.get_mut(squid_id) {
+                    if let Some(squid) = self.ocean.get_mut(squid_id) {
                         squid.rotate(*delta_theta, &self.interaction_options);
                     }
                 }
             }
             Capture::ScaleSelectedSquids { total_scale_factor } => {
                 for squid_id in self.get_selected_squids() {
-                    if let Some(squid) = self.ocean.squids.get_mut(squid_id) {
+                    if let Some(squid) = self.ocean.get_mut(squid_id) {
                         squid.scale(*total_scale_factor, &self.interaction_options);
                     }
                 }
@@ -193,7 +203,7 @@ impl ApplicationState {
 
     pub fn delete_selected(&mut self) {
         for squid_id in self.get_selected_squids() {
-            self.ocean.squids.remove(squid_id);
+            self.ocean.remove(squid_id);
         }
         self.selections.clear();
     }
@@ -203,12 +213,12 @@ impl ApplicationState {
         let created: Vec<SquidRef> = self
             .get_selected_squids()
             .iter()
-            .filter(|squid_id| self.ocean.squids.get(**squid_id).is_some())
+            .filter(|squid_id| self.ocean.get(**squid_id).is_some())
             .map(|x| *x)
             .collect();
         let created: Vec<SquidRef> = created
             .iter()
-            .map(|squid_id| self.insert(self.ocean.squids[*squid_id].duplicate(&offset)))
+            .map(|squid_id| self.insert(self.ocean.get(*squid_id).unwrap().duplicate(&offset)))
             .collect();
 
         self.selections.clear();
@@ -248,7 +258,7 @@ impl ApplicationState {
         }
 
         for squid_id in self.get_selected_squids() {
-            if let Some(squid) = self.ocean.squids.get_mut(squid_id) {
+            if let Some(squid) = self.ocean.get_mut(squid_id) {
                 squid.initiate(initiation);
             }
         }
@@ -257,13 +267,15 @@ impl ApplicationState {
     pub fn get_closest_selection_center(&self, position: &glm::Vec2) -> Option<glm::Vec2> {
         let mut least_distance = f32::INFINITY;
         let mut closest_center: Option<glm::Vec2> = None;
-        for (_, squid) in self.ocean.squids.iter() {
-            let center = squid.get_center();
-            let distance = glm::distance(position, &center);
+        for squid_ref in self.get_selected_squids().iter() {
+            if let Some(squid) = self.ocean.get(*squid_ref) {
+                let center = squid.get_center();
+                let distance = glm::distance(position, &center);
 
-            if distance < least_distance {
-                least_distance = distance;
-                closest_center = Some(center);
+                if distance < least_distance {
+                    least_distance = distance;
+                    closest_center = Some(center);
+                }
             }
         }
         closest_center
@@ -287,16 +299,11 @@ impl ApplicationState {
 
     pub fn insert(&mut self, value: Box<dyn Squid>) -> SquidRef {
         self.prune_selection();
-        self.ocean.squids.insert(value)
+        self.ocean.insert(value)
     }
 
     pub fn prune_selection(&mut self) {
-        self.selections = self
-            .selections
-            .iter()
-            .filter(|x| self.ocean.squids.get(x.squid_id).is_some())
-            .map(|x| *x)
-            .collect();
+        self.selections = self.selections.iter().filter(|x| self.ocean.get(x.squid_id).is_some()).map(|x| *x).collect();
     }
 }
 

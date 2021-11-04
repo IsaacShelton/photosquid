@@ -29,13 +29,23 @@ pub struct NewSelectionInfo {
 }
 
 // A world that objects (aka squids) live in
+// NOTE: Only use direct access if you know what you're doing
+// Use #[allow(deprecated)] to silence warnings when using internal fields
 #[derive(Clone)]
 pub struct Ocean {
-    current_layer: usize,
-    layers: Vec<Layer>,
-    squids: SlotMap<SquidRef, Box<dyn Squid>>,
+    #[deprecated]
+    pub current_layer: usize,
+
+    #[deprecated]
+    pub layers: Vec<Layer>,
+
+    #[deprecated]
+    pub squids: SlotMap<SquidRef, Box<dyn Squid>>,
 }
 
+// Using #[allow(deprecated)] to silence warnings about manually accessing internal
+// fields of 'Ocean' struct
+#[allow(deprecated)]
 impl Ocean {
     pub fn new() -> Self {
         Self {
@@ -65,15 +75,23 @@ impl Ocean {
     }
 
     pub fn remove(&mut self, reference: SquidRef) {
+        for layer in self.layers.iter_mut() {
+            layer.remove_mention(reference);
+        }
+
         self.squids.remove(reference);
     }
 
-    pub fn get(&self, reference: SquidRef) -> Option<&Box<dyn Squid>> {
+    pub fn get<'a>(&'a self, reference: SquidRef) -> Option<&'a Box<dyn Squid>> {
         self.squids.get(reference)
     }
 
-    pub fn get_mut(&mut self, reference: SquidRef) -> Option<&mut Box<dyn Squid>> {
+    pub fn get_mut<'a>(&'a mut self, reference: SquidRef) -> Option<&'a mut Box<dyn Squid>> {
         self.squids.get_mut(reference)
+    }
+
+    pub fn get_layers<'a>(&'a self) -> &'a Vec<Layer> {
+        &self.layers
     }
 
     // Tries to find a squid/squid-limb underneath a point to select

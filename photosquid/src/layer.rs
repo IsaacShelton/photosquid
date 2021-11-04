@@ -2,8 +2,8 @@ use crate::squid::SquidRef;
 
 #[derive(Clone)]
 pub struct Layer {
-    name: String,
-    squids: Vec<SquidRef>,
+    pub name: String,
+    pub squids: Vec<SquidRef>,
 }
 
 impl Layer {
@@ -13,6 +13,10 @@ impl Layer {
 
     pub fn add(&mut self, reference: SquidRef) {
         self.squids.insert(0, reference);
+    }
+
+    pub fn remove_mention(&mut self, reference: SquidRef) {
+        self.squids.retain(|squid_reference| !squid_reference.eq(&reference));
     }
 
     #[allow(dead_code)]

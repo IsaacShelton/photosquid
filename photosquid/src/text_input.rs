@@ -1,6 +1,7 @@
 use crate::{
     aabb::AABB,
     capture::{Capture, KeyCapture},
+    color::Color,
     matrix_helpers::reach_inside_mat4,
     render_ctx::RenderCtx,
     text_helpers,
@@ -176,66 +177,44 @@ impl TextInput {
 
     fn render_text(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>, input_area: &AABB) {
         let input_area_center = glm::vec2(input_area.min_x + input_area.width() / 2.0, input_area.min_y + input_area.height() / 2.0);
+        let relative_position = glm::vec2(0.0, 4.0);
 
-        let color: (f32, f32, f32, f32) = if self.focused {
+        let color = if self.focused {
             if self.input_error {
-                ctx.color_scheme.error.into()
+                ctx.color_scheme.error
             } else {
-                ctx.color_scheme.foreground.into()
+                ctx.color_scheme.foreground
             }
         } else {
-            (0.5, 0.5, 0.5, 1.0)
+            Color::from_hex("#777777")
         };
 
-        Self::render_text_display_centered(
-            ctx,
+        text_helpers::draw_text_centered(
             &mut self.text_display,
-            &format!("{}{}", &self.text, &self.suffix),
             text_system,
             font,
-            &input_area_center,
-            &glm::vec2(0.0, 4.0),
+            &format!("{}{}", &self.text, &self.suffix),
+            &(input_area_center + relative_position),
+            ctx,
             color,
         );
     }
 
     fn render_label(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>, input_area: &AABB) {
         let input_area_center = glm::vec2(input_area.min_x + input_area.width() / 2.0, input_area.min_y + input_area.height() / 2.0);
+        let relative_position = glm::vec2(0.0, -28.0);
 
-        Self::render_text_display_centered(
-            ctx,
+        text_helpers::draw_text_centered(
             &mut self.label_display,
-            &self.label,
             text_system,
             font,
-            &input_area_center,
-            &glm::vec2(0.0, -28.0),
-            (0.5, 0.5, 0.5, 1.0),
+            &self.label,
+            &(input_area_center + relative_position),
+            ctx,
+            Color::from_hex("#777777"),
         );
+
         return;
-    }
-
-    fn render_text_display_centered(
-        ctx: &mut RenderCtx,
-        text_display: &mut Option<TextDisplay<Rc<FontTexture>>>,
-        content: &str,
-        text_system: &TextSystem,
-        font: Rc<FontTexture>,
-        input_area_center: &glm::Vec2,
-        relative_position: &glm::Vec2,
-        color_tuple: (f32, f32, f32, f32),
-    ) {
-        text_helpers::get_or_make_display(text_display, text_system, font, content);
-
-        let text_display = text_display.as_ref().unwrap();
-        let transformation = glm::translation(&glm::vec3(
-            input_area_center.x + relative_position.x - 0.5 * text_display.get_width() * 16.0,
-            input_area_center.y + relative_position.y,
-            0.0,
-        ));
-        let transformation = glm::scale(&transformation, &glm::vec3(16.0, -16.0, 0.0));
-        let matrix = ctx.projection * transformation;
-        ctx.draw_text(&text_display, text_system, matrix, color_tuple).unwrap();
     }
 
     pub fn is_focused(&self) -> bool {

@@ -1,5 +1,11 @@
 use super::Tab;
-use crate::{app::ApplicationState, capture::Capture, interaction::Interaction, render_ctx::RenderCtx};
+use crate::{
+    app::ApplicationState,
+    capture::Capture,
+    interaction::Interaction,
+    ocean::{Ocean, Selection},
+    render_ctx::RenderCtx,
+};
 use glium_text_rusttype::{FontTexture, TextSystem};
 use std::rc::Rc;
 
@@ -16,7 +22,5 @@ impl Tab for Object {
         Capture::Miss
     }
 
-    fn render(&mut self, _ctx: &mut RenderCtx, _text_system: &TextSystem, _font: Rc<FontTexture>) {
-        println!("render");
-    }
+    fn render(&mut self, _ctx: &mut RenderCtx, _text_system: &TextSystem, _font: Rc<FontTexture>, _ocean: &mut Ocean, _selections: &Vec<Selection>) {}
 }

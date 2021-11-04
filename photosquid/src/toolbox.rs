@@ -4,6 +4,7 @@ use crate::{
     interaction::Interaction,
     matrix_helpers::reach_inside_mat4,
     mesh::MeshXyz,
+    ocean::{Ocean, Selection},
     options,
     options::color_picker::ColorPicker,
     render_ctx::RenderCtx,
@@ -105,7 +106,7 @@ impl ToolBox {
         self.add_options_tab_button(options::TabButton::new(
             include_str!("_src_objs/layers.obj"),
             Box::new(DeformPressAnimation {}),
-            tabs.insert(options::tab::Object::new()),
+            tabs.insert(options::tab::Layers::new()),
             &display,
         ));
 
@@ -291,9 +292,12 @@ impl ToolBox {
         &mut self,
         ctx: &mut RenderCtx,
         tools: &mut SlotMap<ToolKey, Box<dyn Tool>>,
+        options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>,
         color_scheme: &ColorScheme,
         text_system: &TextSystem,
         font: Rc<FontTexture>,
+        ocean: &mut Ocean,
+        selections: &Vec<Selection>,
     ) {
         // Background
         ctx.ribbon_mesh.render(ctx, 0.0, 0.0, self.full_width, ctx.height, &color_scheme.dark_ribbon);
@@ -305,7 +309,7 @@ impl ToolBox {
 
         // Tool Options
         if let Some(tool_key) = self.get_selected() {
-            tools[tool_key].render_options(ctx, text_system, font);
+            tools[tool_key].render_options(ctx, text_system, font.clone());
         }
 
         // Selection
@@ -333,6 +337,12 @@ impl ToolBox {
         // Draw hue/value picker
         if self.is_on_object_options() {
             self.color_picker.render(ctx);
+        }
+
+        // Draw panel for tab of options menu
+        let options_tab_key = self.options_tab_buttons[self.tab_selection.external_index].key;
+        if let Some(tab) = options_tabs.get_mut(options_tab_key) {
+            tab.render(ctx, text_system, font, ocean, selections);
         }
     }
 }

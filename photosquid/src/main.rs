@@ -416,9 +416,16 @@ fn main() {
                         }
                     }
 
-                    state
-                        .toolbox
-                        .render(&mut ctx, &mut tools, &state.color_scheme, &state.text_system, state.font.clone());
+                    state.toolbox.render(
+                        &mut ctx,
+                        &mut tools,
+                        &mut options_tabs,
+                        &state.color_scheme,
+                        &state.text_system,
+                        state.font.clone(),
+                        &mut state.ocean,
+                        &state.selections,
+                    );
 
                     if let Some(context_menu) = &mut state.context_menu {
                         context_menu.render(&mut ctx, &state.text_system, state.font.clone());

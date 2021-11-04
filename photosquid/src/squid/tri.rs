@@ -505,7 +505,7 @@ impl Squid for Tri {
         if let Some(name) = &self.name {
             name
         } else {
-            "Unnamed Triangle"
+            "Unnamed Tri"
         }
     }
 

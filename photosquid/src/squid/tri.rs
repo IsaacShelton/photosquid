@@ -7,12 +7,13 @@ use crate::{
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
     interaction::Interaction,
+    math_helpers::DivOrZero,
     matrix_helpers::reach_inside_mat4,
     mesh::MeshXyz,
     ocean::{NewSelection, NewSelectionInfo, Selection},
     render_ctx::RenderCtx,
     smooth::{Lerpable, Smooth},
-    squid,
+    squid::{self, PreviewParams},
 };
 use glium::{glutin::event::MouseButton, Display};
 use nalgebra_glm as glm;
@@ -299,19 +300,38 @@ impl Tri {
 }
 
 impl Squid for Tri {
-    fn render(&mut self, ctx: &mut RenderCtx) {
-        let TriData { rotation, color, .. } = self.data.get_animated();
+    fn render(&mut self, ctx: &mut RenderCtx, as_preview: Option<PreviewParams>) {
+        let TriData {
+            p1, p2, p3, rotation, color, ..
+        } = self.data.get_animated();
 
         self.refresh_mesh(ctx.display);
 
         let center = self.get_animated_center();
-        let transformation = glm::translation(&glm::vec2_to_vec3(&center));
-        let transformation = glm::rotate(&transformation, rotation, &glm::vec3(0.0, 0.0, -1.0));
-        let transformation = glm::translate(&transformation, &glm::vec2_to_vec3(&(-center)));
+        let mut transformation = glm::identity::<f32, 4>();
+
+        if let Some(preview) = &as_preview {
+            let max_distance = glm::distance(&p1, &center).max(glm::distance(&p2, &center).max(glm::distance(&p3, &center)));
+            let factor = 1.0.div_or_zero(max_distance);
+
+            transformation = glm::translate(&transformation, &glm::vec2_to_vec3(&preview.position));
+            transformation = glm::scale(&transformation, &glm::vec3(factor * preview.size, factor * preview.size, 0.0));
+        } else {
+            transformation = glm::translation(&glm::vec2_to_vec3(&center));
+        }
+
+        transformation = glm::rotate(&transformation, rotation, &glm::vec3(0.0, 0.0, -1.0));
+        transformation = glm::translate(&transformation, &glm::vec2_to_vec3(&(-center)));
+
+        let view = if as_preview.is_some() {
+            reach_inside_mat4(&glm::identity::<f32, 4>())
+        } else {
+            reach_inside_mat4(ctx.view)
+        };
 
         let uniforms = glium::uniform! {
             transformation: reach_inside_mat4(&transformation),
-            view: reach_inside_mat4(ctx.view),
+            view: view,
             projection: reach_inside_mat4(ctx.projection),
             color: Into::<[f32; 4]>::into(color)
         };

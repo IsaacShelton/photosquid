@@ -12,6 +12,7 @@ mod context_menu;
 mod icon_button;
 mod interaction;
 mod layer;
+mod math_helpers;
 mod matrix_helpers;
 mod mesh;
 mod obj_helpers;
@@ -408,7 +409,7 @@ fn main() {
 
                     for reference in lowest_squids.iter() {
                         if let Some(squid) = state.ocean.get_mut(*reference) {
-                            squid.render(&mut ctx);
+                            squid.render(&mut ctx, None);
 
                             if selection_contains(&state.selections, *reference) {
                                 squid.render_selected_indication(&mut ctx);

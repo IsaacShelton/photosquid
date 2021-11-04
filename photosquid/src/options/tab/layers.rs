@@ -6,6 +6,7 @@ use crate::{
     interaction::Interaction,
     ocean::{Ocean, Selection},
     render_ctx::RenderCtx,
+    squid::PreviewParams,
     text_helpers,
 };
 use glium_text_rusttype::{FontTexture, TextDisplay, TextSystem};
@@ -30,15 +31,24 @@ impl Layers {
         selections: &Vec<Selection>,
         layer_index: usize,
     ) {
-        let mut text_display: Option<TextDisplay<Rc<FontTexture>>>;
+        let mut text_display: Option<TextDisplay<Rc<FontTexture>>> = None;
 
         // Use '#[allow(deprecated)]' to silence warning when manually accessing
         // internal fields of 'Ocean' struct
         #[allow(deprecated)]
         let layer = &ocean.layers[layer_index];
 
-        let layer_label_y = *y;
-        let mut all_selected = layer.squids.len() != 0;
+        // Draw layer name
+        text_helpers::draw_text(
+            &mut text_display,
+            text_system,
+            font.clone(),
+            layer.get_name(),
+            &glm::vec2(start_x, *y),
+            ctx,
+            Color::from_hex("#555555"),
+        );
+
         *y += 30.0;
 
         // This should be valid without direct access, due to the implementation
@@ -52,10 +62,15 @@ impl Layers {
             let maybe_squid = ocean.squids.get_mut(*squid_reference);
 
             if let Some(squid) = maybe_squid {
+                let preview = Some(PreviewParams {
+                    position: glm::vec2(start_x + 4.0, *y - 4.0),
+                    size: 8.0,
+                });
+                squid.render(ctx, preview);
+
                 let color = if selection_contains(selections, *squid_reference) {
                     ctx.color_scheme.foreground
                 } else {
-                    all_selected = false;
                     Color::from_hex("#777777")
                 };
 
@@ -72,21 +87,6 @@ impl Layers {
                 *y += 30.0;
             }
         }
-
-        text_display = None;
-        text_helpers::draw_text(
-            &mut text_display,
-            text_system,
-            font.clone(),
-            layer.get_name(),
-            &glm::vec2(start_x, layer_label_y),
-            ctx,
-            if all_selected {
-                ctx.color_scheme.foreground
-            } else {
-                Color::from_hex("#555555")
-            },
-        );
     }
 }
 

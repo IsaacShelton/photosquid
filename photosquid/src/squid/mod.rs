@@ -30,7 +30,7 @@ new_key_type! {
 
 pub trait Squid {
     // Renders squid in regular state
-    fn render(&mut self, ctx: &mut RenderCtx);
+    fn render(&mut self, ctx: &mut RenderCtx, as_preview: Option<PreviewParams>);
 
     // Render additional selection indicators and helpers for when
     // the squid is selected
@@ -140,4 +140,9 @@ pub fn angle_difference(alpha: f32, beta: f32) -> f32 {
 pub fn get_point_delta_rotation(screen_position: &glm::Vec2, mouse_position: &glm::Vec2, old_rotation: f32) -> f32 {
     let new_rotation = -1.0 * (mouse_position.y - screen_position.y).atan2(mouse_position.x - screen_position.x);
     return angle_difference(old_rotation, new_rotation);
+}
+
+pub struct PreviewParams {
+    pub position: glm::Vec2,
+    pub size: f32,
 }

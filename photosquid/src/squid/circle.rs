@@ -12,7 +12,7 @@ use crate::{
     ocean::{NewSelection, NewSelectionInfo, Selection},
     render_ctx::RenderCtx,
     smooth::{Lerpable, Smooth},
-    squid,
+    squid::{self, PreviewParams},
 };
 use glium::glutin::event::MouseButton;
 use nalgebra_glm as glm;
@@ -114,19 +114,30 @@ impl Circle {
 }
 
 impl Squid for Circle {
-    fn render(&mut self, ctx: &mut RenderCtx) {
+    fn render(&mut self, ctx: &mut RenderCtx, as_preview: Option<PreviewParams>) {
         let CircleData { x, y, radius, color, .. } = self.data.get_animated();
 
         if self.mesh.is_none() {
             self.mesh = Some(MeshXyz::new_shape_circle(ctx.display));
         }
 
-        let transformation = glm::translation(&glm::vec3(x, y, 0.0));
-        let transformation = glm::scale(&transformation, &glm::vec3(radius, radius, 0.0));
+        let transformation = if let Some(preview) = &as_preview {
+            let matrix = glm::translation(&glm::vec2_to_vec3(&preview.position));
+            glm::scale(&matrix, &glm::vec3(preview.size * 0.5, preview.size * 0.5, 0.0))
+        } else {
+            let matrix = glm::translation(&glm::vec3(x, y, 0.0));
+            glm::scale(&matrix, &glm::vec3(radius, radius, 0.0))
+        };
+
+        let view = if as_preview.is_some() {
+            reach_inside_mat4(&glm::identity::<f32, 4>())
+        } else {
+            reach_inside_mat4(ctx.view)
+        };
 
         let uniforms = glium::uniform! {
             transformation: reach_inside_mat4(&transformation),
-            view: reach_inside_mat4(ctx.view),
+            view: view,
             projection: reach_inside_mat4(ctx.projection),
             color: Into::<[f32; 4]>::into(color)
         };

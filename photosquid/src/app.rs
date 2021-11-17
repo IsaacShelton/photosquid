@@ -3,6 +3,7 @@ use crate::{
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
     interaction::Interaction,
+    interaction_options::InteractionOptions,
     mesh::{MeshXyz, MeshXyzUv},
     ocean::{Ocean, Selection},
     smooth::Smooth,
@@ -35,6 +36,7 @@ pub struct ApplicationState {
     pub toolbox: ToolBox,
     pub ribbon_mesh: MeshXyz,
     pub ring_mesh: MeshXyz,
+    pub check_mesh: MeshXyz,
     pub square_xyzuv: MeshXyzUv,
     pub color_shader_program: Program,
     pub hue_value_picker_shader_program: Program,
@@ -60,27 +62,14 @@ pub struct ApplicationState {
     pub interaction_options: InteractionOptions,
     pub wait_for_stop_drag: bool,
     pub operation: Option<Operation>,
+    pub perform_next_operation_collectively: bool,
 }
 
 pub enum Operation {
-    Rotation { point: glm::Vec2, rotation: f32 },
+    Rotate { point: glm::Vec2, rotation: f32 },
     Scale { point: glm::Vec2, origin: glm::Vec2 },
-}
-
-pub struct InteractionOptions {
-    pub translation_snapping: f32,
-    pub rotation_snapping: f32,
-    pub duplication_offset: glm::Vec2,
-}
-
-impl InteractionOptions {
-    pub fn new() -> Self {
-        Self {
-            translation_snapping: 1.0,
-            rotation_snapping: 0.0,
-            duplication_offset: glm::zero(),
-        }
-    }
+    Spread { point: glm::Vec2, origin: glm::Vec2 },
+    Revolve { point: glm::Vec2, origin: glm::Vec2 },
 }
 
 trait ControlOrCommand {
@@ -176,11 +165,12 @@ impl ApplicationState {
             Capture::Miss => (),
             Capture::AllowDrag => (),
             Capture::NoDrag => (),
+            Capture::TakeFocus => (),
             Capture::Keyboard(..) => (),
             Capture::MoveSelectedSquids { delta } => {
                 for squid_id in self.get_selected_squids() {
                     if let Some(squid) = self.ocean.get_mut(squid_id) {
-                        squid.translate(&delta, &self.interaction_options);
+                        squid.translate(delta, &self.interaction_options);
                     }
                 }
             }
@@ -195,6 +185,20 @@ impl ApplicationState {
                 for squid_id in self.get_selected_squids() {
                     if let Some(squid) = self.ocean.get_mut(squid_id) {
                         squid.scale(*total_scale_factor, &self.interaction_options);
+                    }
+                }
+            }
+            Capture::SpreadSelectedSquids { current } => {
+                for squid_id in self.get_selected_squids() {
+                    if let Some(squid) = self.ocean.get_mut(squid_id) {
+                        squid.spread(current, &self.interaction_options)
+                    }
+                }
+            }
+            Capture::RevolveSelectedSquids { current } => {
+                for squid_id in self.get_selected_squids() {
+                    if let Some(squid) = self.ocean.get_mut(squid_id) {
+                        squid.revolve(current, &self.interaction_options)
                     }
                 }
             }
@@ -214,7 +218,7 @@ impl ApplicationState {
             .get_selected_squids()
             .iter()
             .filter(|squid_id| self.ocean.get(**squid_id).is_some())
-            .map(|x| *x)
+            .copied()
             .collect();
         let created: Vec<SquidRef> = created
             .iter()
@@ -225,7 +229,7 @@ impl ApplicationState {
         self.selections = created.iter().map(|squid_id| Selection::new(*squid_id, None)).collect();
     }
 
-    pub fn get_selected_squids<'a>(&self) -> Vec<SquidRef> {
+    pub fn get_selected_squids(&self) -> Vec<SquidRef> {
         self.selections.iter().filter(|x| x.limb_id.is_none()).map(|x| x.squid_id).collect()
     }
 
@@ -234,7 +238,7 @@ impl ApplicationState {
         self.wait_for_stop_drag = true;
 
         match initiation {
-            Initiation::Rotation => {
+            Initiation::Rotate => {
                 let mouse = self.mouse_position.unwrap();
                 let camera = self.camera.get_animated();
                 let position = glm::vec2(mouse.x, mouse.y) - camera;
@@ -242,7 +246,7 @@ impl ApplicationState {
                 if let Some(rotate_point) = self.get_closest_selection_center(&position) {
                     let point = rotate_point + camera;
                     let rotation = (rotate_point.y - position.y).atan2(position.x - rotate_point.x) - std::f32::consts::FRAC_PI_2;
-                    self.operation = Some(Operation::Rotation { point, rotation });
+                    self.operation = Some(Operation::Rotate { point, rotation });
                 }
             }
             Initiation::Scale => {
@@ -253,6 +257,12 @@ impl ApplicationState {
                 if let Some(origin) = self.get_closest_selection_center(&point) {
                     self.operation = Some(Operation::Scale { point, origin });
                 }
+            }
+            Initiation::Spread { point, center } => {
+                self.operation = Some(Operation::Spread { point, origin: center });
+            }
+            Initiation::Revolve { point, center } => {
+                self.operation = Some(Operation::Revolve { point, origin: center });
             }
             _ => (),
         }
@@ -281,6 +291,24 @@ impl ApplicationState {
         closest_center
     }
 
+    pub fn get_selection_group_center(&self) -> Option<glm::Vec2> {
+        let selected_squids = self.get_selected_squids();
+
+        if selected_squids.is_empty() {
+            return None;
+        }
+
+        let mut average: glm::Vec2 = glm::zero();
+
+        for squid_ref in selected_squids.iter() {
+            if let Some(squid) = self.ocean.get(*squid_ref) {
+                average += squid.get_center();
+            }
+        }
+
+        Some(average / selected_squids.len() as f32)
+    }
+
     pub fn add_history_marker(&mut self) {
         self.history.push(self.ocean.clone());
     }
@@ -303,7 +331,13 @@ impl ApplicationState {
     }
 
     pub fn prune_selection(&mut self) {
-        self.selections = self.selections.iter().filter(|x| self.ocean.get(x.squid_id).is_some()).map(|x| *x).collect();
+        self.selections = self.selections.iter().filter(|x| self.ocean.get(x.squid_id).is_some()).copied().collect();
+    }
+
+    pub fn get_mouse_in_world_space(&self) -> glm::Vec2 {
+        let mouse = self.mouse_position.unwrap();
+        let camera = self.camera.get_animated();
+        glm::vec2(mouse.x, mouse.y) - camera
     }
 }
 
@@ -323,7 +357,7 @@ impl History {
     }
 
     pub fn push(&mut self, value: Ocean) {
-        if self.history.len() == 0 {
+        if self.history.is_empty() {
             self.history.push(Ocean::new());
         } else {
             while self.time_travel < self.history.len() - 1 {
@@ -396,7 +430,7 @@ impl Dragging {
     }
 }
 
-pub fn selection_contains(selections: &Vec<Selection>, squid_reference: SquidRef) -> bool {
+pub fn selection_contains(selections: &[Selection], squid_reference: SquidRef) -> bool {
     for selection in selections.iter() {
         if selection.squid_id == squid_reference {
             return true;

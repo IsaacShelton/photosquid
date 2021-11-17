@@ -6,6 +6,7 @@ use crate::{
     squid::{self, Initiation},
     text_input::TextInput,
     tool,
+    user_input::UserInput,
 };
 use glium::glutin::event::{MouseButton, VirtualKeyCode};
 use glium_text_rusttype::{FontTexture, TextSystem};
@@ -13,21 +14,21 @@ use nalgebra_glm as glm;
 use std::rc::Rc;
 
 pub struct Pointer {
-    translation_snapping_input: TextInput,
-    rotation_snapping_input: TextInput,
+    translation_snapping_input: UserInput,
+    rotation_snapping_input: UserInput,
 }
 
 impl Pointer {
-    pub fn new() -> Box<dyn Tool> {
-        Box::new(Self {
-            translation_snapping_input: TextInput::new("0".into(), "Translation Snapping".into(), "".into()),
-            rotation_snapping_input: TextInput::new("0".into(), "Rotation Snapping".into(), " degrees".into()),
-        })
+    pub fn new() -> Self {
+        Self {
+            translation_snapping_input: UserInput::TextInput(TextInput::new("0".into(), "Translation Snapping".into(), "".into())),
+            rotation_snapping_input: UserInput::TextInput(TextInput::new("0".into(), "Rotation Snapping".into(), " degrees".into())),
+        }
     }
 
     #[must_use]
     pub fn try_select(&self, position: &glm::Vec2, app: &mut ApplicationState) -> TrySelectResult {
-        app.ocean.try_select(&position, &app.camera.get_animated(), &app.selections)
+        app.ocean.try_select(position, &app.camera.get_animated(), &app.selections)
     }
 
     fn handle_try_select_result(result: TrySelectResult, app: &mut ApplicationState) {
@@ -59,11 +60,11 @@ impl Pointer {
 impl Tool for Pointer {
     fn interact(&mut self, interaction: Interaction, app: &mut ApplicationState) -> Capture {
         // Update options
-        if let Some(new_content) = self.translation_snapping_input.poll() {
+        if let Some(new_content) = self.translation_snapping_input.as_text_input_mut().unwrap().poll() {
             app.interaction_options.translation_snapping = new_content.parse::<f32>().unwrap_or_default().max(1.0);
         }
 
-        if let Some(new_content) = self.rotation_snapping_input.poll() {
+        if let Some(new_content) = self.rotation_snapping_input.as_text_input_mut().unwrap().poll() {
             app.interaction_options.rotation_snapping = new_content.parse::<f32>().unwrap_or_default().max(0.0) * std::f32::consts::PI / 180.0;
         }
 
@@ -75,7 +76,7 @@ impl Tool for Pointer {
 
         if let Interaction::Drag { current, .. } = interaction {
             match &mut app.operation {
-                Some(Operation::Rotation { point, rotation }) => {
+                Some(Operation::Rotate { point, rotation }) => {
                     let delta_theta = squid::get_point_delta_rotation(point, &current, *rotation) - std::f32::consts::FRAC_PI_2;
                     *rotation += delta_theta;
                     return Capture::RotateSelectedSquids { delta_theta };
@@ -86,6 +87,12 @@ impl Tool for Pointer {
                     let total_scale_factor = df / d0;
                     return Capture::ScaleSelectedSquids { total_scale_factor };
                 }
+                Some(Operation::Spread { .. }) => {
+                    return Capture::SpreadSelectedSquids { current };
+                }
+                Some(Operation::Revolve { .. }) => {
+                    return Capture::RevolveSelectedSquids { current };
+                }
                 None => (),
             }
         }
@@ -95,15 +102,13 @@ impl Tool for Pointer {
         } else {
             glm::zero()
         };
+
         let possible_selection = self.try_select(&mouse, app);
 
         // First off
         // If we can interact with existing selections, prefer that over selecting different objects
         if if let Interaction::Click { .. } = interaction {
-            match possible_selection {
-                TrySelectResult::New { .. } => false,
-                _ => true,
-            }
+            matches!(possible_selection, TrySelectResult::New { .. })
         } else {
             true
         } {
@@ -131,15 +136,39 @@ impl Tool for Pointer {
             Interaction::Key { virtual_keycode } => {
                 return match virtual_keycode {
                     VirtualKeyCode::G => {
-                        app.initiate(Initiation::Translation);
+                        if app.perform_next_operation_collectively {
+                            if let Some(center) = app.get_selection_group_center() {
+                                app.initiate(Initiation::Spread {
+                                    point: app.get_mouse_in_world_space(),
+                                    center,
+                                });
+                            }
+                            app.perform_next_operation_collectively = false;
+                        } else {
+                            app.initiate(Initiation::Translate);
+                        }
                         Capture::Keyboard(KeyCapture::Capture)
                     }
                     VirtualKeyCode::R => {
-                        app.initiate(Initiation::Rotation);
+                        if app.perform_next_operation_collectively {
+                            if let Some(center) = app.get_selection_group_center() {
+                                app.initiate(Initiation::Revolve {
+                                    point: app.get_mouse_in_world_space(),
+                                    center,
+                                });
+                            }
+                            app.perform_next_operation_collectively = false;
+                        } else {
+                            app.initiate(Initiation::Rotate);
+                        }
                         Capture::Keyboard(KeyCapture::Capture)
                     }
                     VirtualKeyCode::S => {
                         app.initiate(Initiation::Scale);
+                        Capture::Keyboard(KeyCapture::Capture)
+                    }
+                    VirtualKeyCode::C => {
+                        app.perform_next_operation_collectively = !app.perform_next_operation_collectively;
                         Capture::Keyboard(KeyCapture::Capture)
                     }
                     _ => Capture::Miss,
@@ -152,11 +181,20 @@ impl Tool for Pointer {
     }
 
     fn interact_options(&mut self, interaction: Interaction, app: &mut ApplicationState) -> Capture {
-        tool::interact_text_inputs(vec![&mut self.translation_snapping_input, &mut self.rotation_snapping_input], interaction, app)
+        tool::interact_user_inputs(vec![&mut self.translation_snapping_input, &mut self.rotation_snapping_input], interaction, app)?;
+
+        if let Interaction::Key { virtual_keycode } = interaction {
+            if virtual_keycode == VirtualKeyCode::Escape {
+                app.selections.clear();
+                return Capture::Keyboard(KeyCapture::Capture);
+            }
+        }
+
+        Capture::Miss
     }
 
     fn render_options(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>) {
-        tool::render_text_inputs(
+        tool::render_user_inputs(
             ctx,
             text_system,
             font,

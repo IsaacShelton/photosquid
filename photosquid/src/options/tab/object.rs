@@ -12,8 +12,8 @@ use std::rc::Rc;
 pub struct Object {}
 
 impl Object {
-    pub fn new() -> Box<dyn Tab> {
-        Box::new(Self {})
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -22,5 +22,5 @@ impl Tab for Object {
         Capture::Miss
     }
 
-    fn render(&mut self, _ctx: &mut RenderCtx, _text_system: &TextSystem, _font: Rc<FontTexture>, _ocean: &mut Ocean, _selections: &Vec<Selection>) {}
+    fn render(&mut self, _ctx: &mut RenderCtx, _text_system: &TextSystem, _font: Rc<FontTexture>, _ocean: &mut Ocean, _selections: &[Selection]) {}
 }

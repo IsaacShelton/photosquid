@@ -1,18 +1,23 @@
 use super::{Initiation, Squid, SquidRef};
 use crate::{
     accumulator::Accumulator,
-    app::InteractionOptions,
     capture::Capture,
     color::Color,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
     interaction::Interaction,
+    interaction_options::InteractionOptions,
+    math_helpers::angle_difference,
     matrix_helpers::reach_inside_mat4,
     mesh::MeshXyz,
     ocean::{NewSelection, NewSelectionInfo, Selection},
     render_ctx::RenderCtx,
-    smooth::{Lerpable, Smooth},
-    squid::{self, PreviewParams},
+    smooth::{Lerpable, NoLerp, Smooth},
+    squid::{
+        self,
+        behavior::{RevolveBehavior, SpreadBehavior, TranslateBehavior},
+        PreviewParams,
+    },
 };
 use glium::glutin::event::MouseButton;
 use nalgebra_glm as glm;
@@ -24,12 +29,25 @@ pub struct Circle {
     created: Instant,
     mesh: Option<MeshXyz>,
 
-    // Tweaking parameters
-    moving: bool,
-    scale_rotating: bool,
-    translation_accumulator: Accumulator<glm::Vec2>,
+    // --------- Tweaking parameters ---------
+
+    // Translate
+    translate_behavior: TranslateBehavior,
+
+    // Virtual Rotate
     rotation_accumulator: Accumulator<f32>,
+
+    // Scale
     prescale_size: f32,
+
+    // Scale and Virtual Rotate
+    scale_rotating: bool,
+
+    // Spread
+    spread_behavior: SpreadBehavior,
+
+    // Revolve
+    revolve_behavior: RevolveBehavior,
 }
 
 #[derive(Copy, Clone)]
@@ -37,7 +55,7 @@ pub struct CircleData {
     x: f32,
     y: f32,
     radius: f32,
-    color: Color,
+    color: NoLerp<Color>,
     virtual_rotation: f32,
 }
 
@@ -61,7 +79,7 @@ impl Circle {
             x,
             y,
             radius,
-            color,
+            color: NoLerp(color),
             virtual_rotation: 0.0,
         };
         Self::from_data(data)
@@ -73,11 +91,12 @@ impl Circle {
             data: Smooth::new(data, Duration::from_millis(500)),
             created: Instant::now(),
             mesh: None,
-            moving: false,
+            translate_behavior: Default::default(),
             scale_rotating: false,
-            translation_accumulator: Accumulator::new(),
             rotation_accumulator: Accumulator::new(),
             prescale_size: data.radius,
+            spread_behavior: Default::default(),
+            revolve_behavior: Default::default(),
         }
     }
 
@@ -99,7 +118,8 @@ impl Circle {
 
         let old_rotation = real.virtual_rotation + self.rotation_accumulator.residue();
         let new_rotation = -1.0 * (mouse_position.y - screen_y).atan2(mouse_position.x - screen_x);
-        return squid::angle_difference(old_rotation, new_rotation);
+
+        angle_difference(old_rotation, new_rotation)
     }
 
     fn reposition_radius(&mut self, mouse: &glm::Vec2, camera: &glm::Vec2) {
@@ -139,7 +159,7 @@ impl Squid for Circle {
             transformation: reach_inside_mat4(&transformation),
             view: view,
             projection: reach_inside_mat4(ctx.projection),
-            color: Into::<[f32; 4]>::into(color)
+            color: Into::<[f32; 4]>::into(color.0)
         };
 
         let mesh = self.mesh.as_ref().unwrap();
@@ -175,7 +195,7 @@ impl Squid for Circle {
     fn interact(&mut self, interaction: &Interaction, camera: &glm::Vec2, _options: &InteractionOptions) -> Capture {
         match interaction {
             Interaction::PreClick => {
-                self.moving = false;
+                self.translate_behavior.moving = false;
                 self.scale_rotating = false;
             }
             Interaction::Click {
@@ -188,8 +208,8 @@ impl Squid for Circle {
                     return Capture::AllowDrag;
                 }
 
-                if self.is_point_over(&position, camera) {
-                    self.moving = true;
+                if self.is_point_over(position, camera) {
+                    self.translate_behavior.moving = true;
                     return Capture::AllowDrag;
                 }
             }
@@ -197,13 +217,13 @@ impl Squid for Circle {
                 if self.scale_rotating {
                     // Since rotating and scaling at same time, it doesn't apply to others
                     self.reposition_radius(current, camera);
-                } else if self.moving {
+                } else if self.translate_behavior.moving {
                     return Capture::MoveSelectedSquids { delta: *delta };
                 }
             }
             Interaction::MouseRelease { button: MouseButton::Left, .. } => {
                 self.scale_rotating = false;
-                self.translation_accumulator.clear();
+                self.translate_behavior.accumulator.clear();
                 self.rotation_accumulator.clear();
             }
             _ => (),
@@ -213,7 +233,9 @@ impl Squid for Circle {
     }
 
     fn translate(&mut self, raw_delta: &glm::Vec2, options: &InteractionOptions) {
-        if let Some(delta) = self.translation_accumulator.accumulate(raw_delta, options.translation_snapping) {
+        let delta = self.translate_behavior.express(raw_delta, options);
+
+        if delta != glm::zero::<glm::Vec2>() {
             let mut new_data = *self.data.get_real();
             new_data.x += delta.x;
             new_data.y += delta.y;
@@ -235,6 +257,27 @@ impl Squid for Circle {
         self.data.set(new_data);
     }
 
+    fn spread(&mut self, current: &glm::Vec2, _options: &InteractionOptions) {
+        let new_position = self.spread_behavior.express(current);
+
+        let mut new_data = *self.data.get_real();
+        new_data.x = new_position.x;
+        new_data.y = new_position.y;
+        self.data.set(new_data);
+    }
+
+    fn revolve(&mut self, current: &glm::Vec2, options: &InteractionOptions) {
+        if let Some(expression) = self.revolve_behavior.express(current, options) {
+            let mut new_data = *self.data.get_real();
+
+            let new_center = expression.apply_origin_rotation_to_center();
+            new_data.x = new_center.x;
+            new_data.y = new_center.y;
+            new_data.virtual_rotation += expression.delta_object_rotation;
+            self.data.set(new_data);
+        }
+    }
+
     fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool {
         let real = self.data.get_real();
         let position = glm::vec2(real.x, real.y) + camera;
@@ -246,7 +289,7 @@ impl Squid for Circle {
             Some(NewSelection {
                 selection: Selection::new(self_reference, None),
                 info: NewSelectionInfo {
-                    color: Some(self.data.get_real().color),
+                    color: Some(self.data.get_real().color.0),
                 },
             })
         } else {
@@ -255,7 +298,7 @@ impl Squid for Circle {
     }
 
     fn select(&mut self) {
-        self.moving = true;
+        self.translate_behavior.moving = true;
     }
 
     fn try_context_menu(&self, underneath: &glm::Vec2, camera: &glm::Vec2, _self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu> {
@@ -268,7 +311,7 @@ impl Squid for Circle {
 
     fn set_color(&mut self, color: Color) {
         let mut new_data = *self.data.get_real();
-        new_data.color = color;
+        new_data.color = NoLerp(color);
         self.data.set(new_data);
     }
 
@@ -285,9 +328,17 @@ impl Squid for Circle {
 
     fn initiate(&mut self, initiation: Initiation) {
         match initiation {
-            Initiation::Translation => self.moving = true,
-            Initiation::Rotation => (),
+            Initiation::Translate => self.translate_behavior.moving = true,
+            Initiation::Rotate => (),
             Initiation::Scale => self.prescale_size = self.data.get_real().radius,
+            Initiation::Spread { point, center } => {
+                self.spread_behavior = SpreadBehavior {
+                    point,
+                    origin: center,
+                    start: self.get_center(),
+                };
+            }
+            Initiation::Revolve { point, center } => self.revolve_behavior.set(&center, &self.get_center(), &point),
         }
     }
 
@@ -296,12 +347,8 @@ impl Squid for Circle {
         glm::vec2(x, y)
     }
 
-    fn get_name<'a>(&'a self) -> &'a str {
-        if let Some(name) = &self.name {
-            name
-        } else {
-            "Unnamed Circle"
-        }
+    fn get_name(&self) -> &str {
+        self.name.as_deref().unwrap_or("Unnamed Circle")
     }
 
     fn set_name(&mut self, name: String) {

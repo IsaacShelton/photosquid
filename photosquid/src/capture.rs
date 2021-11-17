@@ -6,10 +6,13 @@ pub enum Capture {
     Miss,
     AllowDrag,
     NoDrag,
+    TakeFocus,
     Keyboard(KeyCapture),
     MoveSelectedSquids { delta: glm::Vec2 },
     RotateSelectedSquids { delta_theta: f32 },
     ScaleSelectedSquids { total_scale_factor: f32 },
+    SpreadSelectedSquids { current: glm::Vec2 },
+    RevolveSelectedSquids { current: glm::Vec2 },
 }
 
 #[derive(Debug, PartialEq)]

@@ -1,6 +1,7 @@
 use glium::glutin::event::{MouseButton, VirtualKeyCode};
 use nalgebra_glm as glm;
 
+#[derive(Copy, Clone)]
 pub enum Interaction {
     PreClick,
     Click { button: MouseButton, position: glm::Vec2 },

@@ -19,7 +19,7 @@ impl MeshXyz {
         Self::from_vertices(&shape, display)
     }
 
-    pub fn from_vertices(vertices: &Vec<Vertex>, display: &Display) -> Self {
+    pub fn from_vertices(vertices: &[Vertex], display: &Display) -> Self {
         let vertex_buffer = VertexBuffer::new(display, vertices).unwrap();
         let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
         Self { vertex_buffer, indices }
@@ -43,8 +43,13 @@ impl MeshXyz {
         Self::from_vertices(&shape, display)
     }
 
+    pub fn new_ui_check(display: &glium::Display) -> Self {
+        let shape = obj_helpers::obj_data_to_shape(include_str!("_src_objs/check.obj"));
+        Self::from_vertices(&shape, display)
+    }
+
     pub fn new_shape_square(display: &Display) -> Self {
-        Self::new(include_str!("_src_objs/shape/rect.obj"), &display)
+        Self::new(include_str!("_src_objs/shape/rect.obj"), display)
     }
 
     pub fn new_shape_triangle(display: &glium::Display, p1: glm::Vec2, p2: glm::Vec2, p3: glm::Vec2) -> Self {
@@ -55,7 +60,7 @@ impl MeshXyz {
     }
 
     pub fn new_shape_circle(display: &Display) -> Self {
-        Self::new(include_str!("_src_objs/shape/circle.obj"), &display)
+        Self::new(include_str!("_src_objs/shape/circle.obj"), display)
     }
 
     pub fn render(&self, ctx: &mut RenderCtx, x: f32, y: f32, w_scale: f32, h_scale: f32, color: &Color) {

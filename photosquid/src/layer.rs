@@ -21,16 +21,16 @@ impl Layer {
 
     #[allow(dead_code)]
     pub fn get_lowest(&self) -> impl Iterator<Item = SquidRef> + '_ {
-        self.squids.iter().rev().map(|x| *x)
+        self.squids.iter().rev().copied()
     }
 
     #[allow(dead_code)]
     pub fn get_highest(&self) -> impl Iterator<Item = SquidRef> + '_ {
-        self.squids.iter().map(|x| *x)
+        self.squids.iter().copied()
     }
 
     #[allow(dead_code)]
-    pub fn get_name<'a>(&'a self) -> &'a str {
+    pub fn get_name(&self) -> &str {
         &self.name
     }
 }

@@ -31,7 +31,7 @@ pub fn draw_text<'a>(
     let transformation = glm::translation(&glm::vec3(location.x, location.y, 0.0));
     let transformation = glm::scale(&transformation, &glm::vec3(16.0, -16.0, 0.0));
     let matrix = ctx.projection * transformation;
-    ctx.draw_text(&text_display, text_system, matrix, color.into()).unwrap();
+    ctx.draw_text(text_display, text_system, matrix, color.into()).unwrap();
 }
 
 pub fn draw_text_centered<'a>(
@@ -49,5 +49,5 @@ pub fn draw_text_centered<'a>(
     let transformation = glm::translation(&glm::vec3(location.x - 0.5 * text_display.get_width() * 16.0, location.y, 0.0));
     let transformation = glm::scale(&transformation, &glm::vec3(16.0, -16.0, 0.0));
     let matrix = ctx.projection * transformation;
-    ctx.draw_text(&text_display, text_system, matrix, color.into()).unwrap();
+    ctx.draw_text(text_display, text_system, matrix, color.into()).unwrap();
 }

@@ -17,5 +17,6 @@ pub fn is_point_inside_rectangle(a: glm::Vec2, b: glm::Vec2, c: glm::Vec2, d: gl
 
     let cumulative_area = triangle_area(a, p, d) + triangle_area(d, p, c) + triangle_area(c, p, b) + triangle_area(p, b, a);
     let area = triangle_area(a, b, c) + triangle_area(c, d, a);
-    return cumulative_area <= area;
+
+    cumulative_area <= area
 }

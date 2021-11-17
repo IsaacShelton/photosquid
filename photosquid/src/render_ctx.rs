@@ -22,6 +22,7 @@ pub struct RenderCtx<'a, 'f> {
     pub scale_factor: f64,
     pub ribbon_mesh: &'a MeshXyz,
     pub ring_mesh: &'a MeshXyz,
+    pub check_mesh: &'a MeshXyz,
     pub square_xyzuv: &'a MeshXyzUv,
     pub color_scheme: &'a ColorScheme,
     pub camera: &'a glm::Vec2,

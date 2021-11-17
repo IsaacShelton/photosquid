@@ -1,14 +1,16 @@
+pub mod behavior;
 pub mod circle;
 pub mod rect;
 pub mod tri;
 
 use crate::{
-    app::InteractionOptions,
     capture::Capture,
     color::Color,
     color_scheme::ColorScheme,
     context_menu::{ContextAction, ContextMenu, ContextMenuOption},
     interaction::Interaction,
+    interaction_options::InteractionOptions,
+    math_helpers::angle_difference,
     ocean::NewSelection,
     render_ctx::RenderCtx,
 };
@@ -53,6 +55,12 @@ pub trait Squid {
     // Scales a squid body
     fn scale(&mut self, total_scale_factor: f32, options: &InteractionOptions);
 
+    // Spreads a squid body toward/from a point
+    fn spread(&mut self, current: &glm::Vec2, options: &InteractionOptions);
+
+    // Revolves a squid body around point
+    fn revolve(&mut self, current: &glm::Vec2, options: &InteractionOptions);
+
     // Attempts to get a selection for this squid or a selection for a limb of this squid
     // under the point (x, y)
     fn try_select(&self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection>;
@@ -79,7 +87,7 @@ pub trait Squid {
     fn get_center(&self) -> glm::Vec2;
 
     // Opaque name getter/setter
-    fn get_name<'a>(&'a self) -> &'a str;
+    fn get_name(&self) -> &str;
     fn set_name(&mut self, name: String);
 
     // Returns the world positions of all "opaque" handles (aka handles that will take priority over new selections)
@@ -114,9 +122,11 @@ impl Clone for Box<dyn Squid> {
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum Initiation {
-    Translation,
-    Rotation,
+    Translate,
+    Rotate,
     Scale,
+    Spread { point: glm::Vec2, center: glm::Vec2 },
+    Revolve { point: glm::Vec2, center: glm::Vec2 },
 }
 
 pub const HANDLE_RADIUS: f32 = 8.0;
@@ -127,19 +137,17 @@ pub fn common_context_menu(underneath: &glm::Vec2, color_scheme: &ColorScheme) -
     let grab = ContextMenuOption::new("Grab".to_string(), "G".to_string(), ContextAction::GrabSelected);
     let rotate = ContextMenuOption::new("Rotate".to_string(), "R".to_string(), ContextAction::RotateSelected);
     let scale = ContextMenuOption::new("Scale".to_string(), "S".to_string(), ContextAction::ScaleSelected);
-    let context_menu = ContextMenu::new(*underneath, vec![delete, duplicate, grab, rotate, scale], color_scheme.dark_ribbon);
-    context_menu
-}
-
-pub fn angle_difference(alpha: f32, beta: f32) -> f32 {
-    use std::f32::consts::{PI, TAU};
-    let difference = (beta - alpha + PI) % TAU - PI;
-    return if difference < -PI { difference + TAU } else { difference };
+    let collectively = ContextMenuOption::new("Collectively".to_string(), "C".to_string(), ContextAction::Collectively);
+    ContextMenu::new(
+        *underneath,
+        vec![delete, duplicate, grab, rotate, scale, collectively],
+        color_scheme.dark_ribbon,
+    )
 }
 
 pub fn get_point_delta_rotation(screen_position: &glm::Vec2, mouse_position: &glm::Vec2, old_rotation: f32) -> f32 {
     let new_rotation = -1.0 * (mouse_position.y - screen_position.y).atan2(mouse_position.x - screen_position.x);
-    return angle_difference(old_rotation, new_rotation);
+    angle_difference(old_rotation, new_rotation)
 }
 
 pub struct PreviewParams {

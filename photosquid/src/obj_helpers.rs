@@ -25,5 +25,5 @@ pub fn obj_data_to_shape(data: &str) -> Vec<Vertex> {
         }
     }
 
-    return vertices;
+    vertices
 }

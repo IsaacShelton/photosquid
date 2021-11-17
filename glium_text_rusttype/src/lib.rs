@@ -179,18 +179,14 @@ extern crate rusttype;
 #[macro_use]
 extern crate glium;
 
-use std::borrow::Cow;
-use std::collections::HashMap;
-use std::default::Default;
-use std::io::Read;
-use std::ops::Deref;
-use std::rc::Rc;
+use std::{borrow::Cow, collections::HashMap, default::Default, io::Read, ops::Deref, rc::Rc};
 
 use rusttype::{Point, Rect};
 
-use glium::backend::Context;
-use glium::backend::Facade;
-use glium::DrawParameters;
+use glium::{
+    backend::{Context, Facade},
+    DrawParameters,
+};
 
 /// Texture which contains the characters of the font.
 pub struct FontTexture {
@@ -538,8 +534,7 @@ where
     };
 
     let params = {
-        use glium::BlendingFunction::Addition;
-        use glium::LinearBlendingFactor::*;
+        use glium::{BlendingFunction::Addition, LinearBlendingFactor::*};
 
         let blending_function = Addition {
             source: SourceAlpha,
@@ -598,7 +593,7 @@ where
         tex: glium::uniforms::Sampler(&texture.texture, sampler_behavior)
     };
 
-    target.draw(vertex_buffer, index_buffer, &system.program, &uniforms, &parameters)
+    target.draw(vertex_buffer, index_buffer, &system.program, &uniforms, parameters)
 }
 
 fn build_font_image<I>(font: &rusttype::Font, characters_list: I, font_size: u32) -> Result<(TextureData, HashMap<char, CharacterInfos>), Error>
@@ -623,7 +618,7 @@ where
     // everything as long as the texture is at least as wide as the widest
     // character we just try to estimate a width so that width ~= height
     let texture_width = get_nearest_po2(std::cmp::max(
-        font_size * 2 as u32,
+        font_size * 2_u32,
         ((((size_estimation as u32) * font_size * font_size) as f32).sqrt()) as u32,
     ));
 

@@ -56,9 +56,9 @@ impl ColorPicker {
     pub fn drag(&mut self, interaction: &Interaction, screen_width: f32) -> Capture {
         if let Interaction::Drag { current, .. } = interaction {
             if self.is_selecting_hue_value {
-                self.set_hue_value_with_mouse(&current, screen_width);
+                self.set_hue_value_with_mouse(current, screen_width);
             } else if self.is_selecting_saturation {
-                self.set_saturation_with_mouse(&current, screen_width);
+                self.set_saturation_with_mouse(current, screen_width);
             }
             return Capture::AllowDrag;
         }
@@ -156,7 +156,7 @@ impl ColorPicker {
         let uniforms = glium::uniform! {
             transformation: reach_inside_mat4(&transformation),
             view: reach_inside_mat4(&identity),
-            projection: reach_inside_mat4(&ctx.projection),
+            projection: reach_inside_mat4(ctx.projection),
             saturation: self.saturation_point.get_animated(),
             point: [hue_value_point_animated.x, hue_value_point_animated.y],
             dimensions: [dimensions.x, dimensions.y],
@@ -165,7 +165,7 @@ impl ColorPicker {
         ctx.draw(
             &color_picker_mesh.vertex_buffer,
             &color_picker_mesh.indices,
-            &ctx.hue_value_picker_shader,
+            ctx.hue_value_picker_shader,
             &uniforms,
             &Default::default(),
         )
@@ -190,7 +190,7 @@ impl ColorPicker {
         let uniforms = glium::uniform! {
             transformation: reach_inside_mat4(&transformation),
             view: reach_inside_mat4(&identity),
-            projection: reach_inside_mat4(&ctx.projection),
+            projection: reach_inside_mat4(ctx.projection),
             hue: hue,
             value: value,
             point: [self.get_saturation_point().get_animated(), 0.5],
@@ -200,7 +200,7 @@ impl ColorPicker {
         ctx.draw(
             &color_picker_mesh.vertex_buffer,
             &color_picker_mesh.indices,
-            &ctx.saturation_picker_shader,
+            ctx.saturation_picker_shader,
             &uniforms,
             &Default::default(),
         )

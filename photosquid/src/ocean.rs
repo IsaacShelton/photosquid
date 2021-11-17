@@ -1,4 +1,5 @@
 use crate::{
+    annotations::UnsafeTemporary,
     app::selection_contains,
     color::Color,
     color_scheme::ColorScheme,
@@ -17,10 +18,7 @@ pub struct Selection {
 
 impl Selection {
     pub fn new(squid_id: SquidRef, limb_id: Option<SquidLimbRef>) -> Self {
-        Self {
-            squid_id: squid_id,
-            limb_id: limb_id,
-        }
+        Self { squid_id, limb_id }
     }
 }
 
@@ -65,7 +63,7 @@ impl Ocean {
     }
 
     fn force_valid_layer(&mut self) {
-        if self.layers.len() == 0 {
+        if self.layers.is_empty() {
             self.layers.push(Default::default());
         }
 
@@ -82,20 +80,20 @@ impl Ocean {
         self.squids.remove(reference);
     }
 
-    pub fn get<'a>(&'a self, reference: SquidRef) -> Option<&'a Box<dyn Squid>> {
-        self.squids.get(reference)
+    pub fn get(&self, reference: SquidRef) -> Option<UnsafeTemporary<&dyn Squid>> {
+        self.squids.get(reference).map(|x| &**x)
     }
 
-    pub fn get_mut<'a>(&'a mut self, reference: SquidRef) -> Option<&'a mut Box<dyn Squid>> {
-        self.squids.get_mut(reference)
+    pub fn get_mut(&mut self, reference: SquidRef) -> Option<UnsafeTemporary<&mut (dyn Squid + 'static)>> {
+        self.squids.get_mut(reference).map(|c| &mut **c)
     }
 
-    pub fn get_layers<'a>(&'a self) -> &'a Vec<Layer> {
+    pub fn get_layers(&self) -> &[Layer] {
         &self.layers
     }
 
     // Tries to find a squid/squid-limb underneath a point to select
-    pub fn try_select(&mut self, underneath: &glm::Vec2, camera: &glm::Vec2, existing_selections: &Vec<Selection>) -> TrySelectResult {
+    pub fn try_select(&mut self, underneath: &glm::Vec2, camera: &glm::Vec2, existing_selections: &[Selection]) -> TrySelectResult {
         let highest_squids: Vec<SquidRef> = self.get_squids_highest().collect();
         let world_mouse = underneath - camera;
 

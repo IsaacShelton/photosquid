@@ -33,7 +33,7 @@ impl Color {
 
     // Converts a 'Color' to hue, saturation, and value parameters
     // Where h, s, and v are in the range [0.0, 1.0]
-    pub fn to_hsv(&self) -> (f32, f32, f32) {
+    pub fn to_hsv(self) -> (f32, f32, f32) {
         use palette::FromColor;
         use std::f32::consts::TAU;
         let hsv = palette::Hsv::from_color(self.to_palette_srgb());
@@ -47,7 +47,7 @@ impl Color {
         Self::new(1.0, 1.0, 1.0, 1.0)
     }
 
-    pub fn to_palette_srgb(&self) -> palette::Srgb {
+    pub fn to_palette_srgb(self) -> palette::Srgb {
         palette::Srgb::new(self.r, self.g, self.b)
     }
 }

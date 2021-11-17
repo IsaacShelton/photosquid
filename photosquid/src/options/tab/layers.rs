@@ -16,21 +16,22 @@ use std::rc::Rc;
 pub struct Layers {}
 
 impl Layers {
-    pub fn new() -> Box<dyn Tab> {
-        Box::new(Self {})
+    pub fn new() -> Self {
+        Self {}
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_layer(
         &mut self,
         ctx: &mut RenderCtx,
         text_system: &TextSystem,
         font: Rc<FontTexture>,
-        start_x: f32,
         y: &mut f32,
         ocean: &mut Ocean,
-        selections: &Vec<Selection>,
+        selections: &[Selection],
         layer_index: usize,
     ) {
+        let start_x = ctx.width - 256.0 + 16.0;
         let mut text_display: Option<TextDisplay<Rc<FontTexture>>> = None;
 
         // Use '#[allow(deprecated)]' to silence warning when manually accessing
@@ -95,12 +96,11 @@ impl Tab for Layers {
         Capture::Miss
     }
 
-    fn render(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>, ocean: &mut Ocean, selections: &Vec<Selection>) {
-        let start_x = ctx.width - 256.0 + 16.0;
+    fn render(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>, ocean: &mut Ocean, selections: &[Selection]) {
         let mut y = 100.0;
 
         for i in 0..ocean.get_layers().len() {
-            self.render_layer(ctx, text_system, font.clone(), start_x, &mut y, ocean, selections, i);
+            self.render_layer(ctx, text_system, font.clone(), &mut y, ocean, selections, i);
         }
     }
 }

@@ -1,19 +1,23 @@
 use super::{Initiation, Squid, SquidRef};
 use crate::{
     accumulator::Accumulator,
-    app::InteractionOptions,
     capture::Capture,
     color::Color,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
     interaction::Interaction,
-    math_helpers::DivOrZero,
+    interaction_options::InteractionOptions,
+    math_helpers::{angle_difference, DivOrZero},
     matrix_helpers::reach_inside_mat4,
     mesh::MeshXyz,
     ocean::{NewSelection, NewSelectionInfo, Selection},
     render_ctx::RenderCtx,
-    smooth::{Lerpable, Smooth},
-    squid::{self, PreviewParams},
+    smooth::{Lerpable, MultiLerp, NoLerp, Smooth},
+    squid::{
+        self,
+        behavior::{RevolveBehavior, SpreadBehavior, TranslateBehavior},
+        PreviewParams,
+    },
 };
 use glium::{glutin::event::MouseButton, Display};
 use nalgebra_glm as glm;
@@ -31,22 +35,35 @@ pub struct Tri {
     mesh_p2: glm::Vec2,
     mesh_p3: glm::Vec2,
 
-    // Tweaking parameters
+    // --------- Tweaking parameters ---------
+
+    // Move point
     moving_point: Option<usize>, // (zero indexed)
-    moving: bool,
+
+    // Translate
+    translate_behavior: TranslateBehavior,
+
+    // Rotate
     rotating: bool,
-    translation_accumulator: Accumulator<glm::Vec2>,
     rotation_accumulator: Accumulator<f32>,
     virtual_rotation: f32, // Rotation that only applies to the handle
+
+    // Scale
     prescale_size: [glm::Vec2; 3],
+
+    // Spread
+    spread_behavior: SpreadBehavior,
+
+    // Revolve
+    revolve_behavior: RevolveBehavior,
 }
 
 #[derive(Copy, Clone)]
 pub struct TriData {
-    p1: glm::Vec2,
-    p2: glm::Vec2,
-    p3: glm::Vec2,
-    color: Color,
+    p1: MultiLerp<glm::Vec2>,
+    p2: MultiLerp<glm::Vec2>,
+    p3: MultiLerp<glm::Vec2>,
+    color: NoLerp<Color>,
     rotation: f32,
 }
 
@@ -66,33 +83,47 @@ impl Lerpable for TriData {
 
 impl Tri {
     pub fn new(p1: glm::Vec2, p2: glm::Vec2, p3: glm::Vec2, rotation: f32, color: Color) -> Self {
-        let data = TriData { p1, p2, p3, rotation, color };
+        let data = TriData {
+            p1: MultiLerp::From(p1),
+            p2: MultiLerp::From(p2),
+            p3: MultiLerp::From(p3),
+            rotation,
+            color: NoLerp(color),
+        };
         Self::from_data(data)
     }
 
     pub fn from_data(data: TriData) -> Self {
-        let center = Self::get_center(&data.p1, &data.p2, &data.p3);
+        let p1 = &data.p1.reveal();
+        let p2 = &data.p2.reveal();
+        let p3 = &data.p3.reveal();
+        let center = Self::get_center(p1, p2, p3);
 
         Self {
             name: None,
             data: Smooth::new(data, Duration::from_millis(500)),
             created: Instant::now(),
             mesh: None,
-            mesh_p1: data.p1,
-            mesh_p2: data.p2,
-            mesh_p3: data.p3,
+            mesh_p1: *p1,
+            mesh_p2: *p2,
+            mesh_p3: *p3,
             moving_point: None,
-            moving: false,
+            translate_behavior: Default::default(),
             rotating: false,
-            translation_accumulator: Accumulator::new(),
             rotation_accumulator: Accumulator::new(),
             virtual_rotation: 0.0,
-            prescale_size: [data.p1 - center, data.p2 - center, data.p3 - center],
+            prescale_size: [p1 - center, p2 - center, p3 - center],
+            spread_behavior: Default::default(),
+            revolve_behavior: Default::default(),
         }
     }
 
     fn refresh_mesh(&mut self, display: &Display) {
         let TriData { p1, p2, p3, .. } = self.data.get_animated();
+
+        let p1 = p1.reveal();
+        let p2 = p2.reveal();
+        let p3 = p3.reveal();
 
         if self.mesh.is_none()
             || glm::distance2(&p1, &self.mesh_p1) > 1.0
@@ -110,9 +141,9 @@ impl Tri {
             (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
         }
 
-        let d1 = sign(&p, &p1, &p2);
-        let d2 = sign(&p, &p2, &p3);
-        let d3 = sign(&p, &p3, &p1);
+        let d1 = sign(p, p1, p2);
+        let d2 = sign(p, p2, p3);
+        let d3 = sign(p, p3, p1);
 
         let has_neg = d1 < 0.0 || d2 < 0.0 || d3 < 0.0;
         let has_pos = d1 > 0.0 || d2 > 0.0 || d3 > 0.0;
@@ -122,12 +153,12 @@ impl Tri {
 
     fn get_real_center(&self) -> glm::Vec2 {
         let TriData { p1, p2, p3, .. } = self.data.get_real();
-        Self::get_center(p1, p2, p3)
+        Self::get_center(&p1.reveal(), &p2.reveal(), &p3.reveal())
     }
 
     fn get_animated_center(&self) -> glm::Vec2 {
         let TriData { p1, p2, p3, .. } = self.data.get_animated();
-        Self::get_center(&p1, &p2, &p3)
+        Self::get_center(&p1.reveal(), &p2.reveal(), &p3.reveal())
     }
 
     fn get_center(p1: &glm::Vec2, p2: &glm::Vec2, p3: &glm::Vec2) -> glm::Vec2 {
@@ -138,7 +169,7 @@ impl Tri {
         let TriData { p1, p2, p3, rotation, .. } = self.data.get_animated();
         let center = self.get_animated_center();
 
-        [p1 - center, p2 - center, p3 - center]
+        [p1.reveal() - center, p2.reveal() - center, p3.reveal() - center]
             .iter()
             .map(|p| glm::rotate_vec2(p, -rotation) + center + camera)
             .collect()
@@ -147,7 +178,11 @@ impl Tri {
     fn get_rotate_handle_location(&self, camera: &glm::Vec2) -> glm::Vec2 {
         let center = self.get_animated_center();
         let TriData { p1, p2, p3, rotation, .. } = self.data.get_animated();
+
         let rotation = rotation + self.virtual_rotation;
+        let p1 = p1.reveal();
+        let p2 = p2.reveal();
+        let p3 = p3.reveal();
 
         let max_distance = glm::distance(&p1, &center).max(glm::distance(&p2, &center).max(glm::distance(&p3, &center)));
 
@@ -179,7 +214,8 @@ impl Tri {
 
         let old_rotation = real.rotation + self.rotation_accumulator.residue() + self.virtual_rotation;
         let new_rotation = -1.0 * (mouse_position.y - screen_center.y).atan2(mouse_position.x - screen_center.x);
-        return squid::angle_difference(old_rotation, new_rotation);
+
+        angle_difference(old_rotation, new_rotation)
     }
 
     fn reposition_point(&mut self, mouse_position: &glm::Vec2, camera: &glm::Vec2) {
@@ -187,9 +223,9 @@ impl Tri {
         let rotation = self.data.get_real().rotation;
         let center = self.get_real_center();
 
-        let mut p1 = glm::rotate_vec2(&(real.p1 - center), -rotation);
-        let mut p2 = glm::rotate_vec2(&(real.p2 - center), -rotation);
-        let mut p3 = glm::rotate_vec2(&(real.p3 - center), -rotation);
+        let mut p1 = glm::rotate_vec2(&(real.p1.reveal() - center), -rotation);
+        let mut p2 = glm::rotate_vec2(&(real.p2.reveal() - center), -rotation);
+        let mut p3 = glm::rotate_vec2(&(real.p3.reveal() - center), -rotation);
 
         let new_p = glm::rotate_vec2(&(mouse_position - camera - center), 0.0);
 
@@ -212,24 +248,24 @@ impl Tri {
 
             {
                 let mut_real = self.data.manual_get_real();
-                mut_real.p1 = p1;
-                mut_real.p2 = p2;
-                mut_real.p3 = p3;
+                mut_real.p1 = MultiLerp::From(p1);
+                mut_real.p2 = MultiLerp::From(p2);
+                mut_real.p3 = MultiLerp::From(p3);
                 mut_real.rotation = 0.0;
             }
 
             {
                 let mut_previous = self.data.manual_get_previous();
-                mut_previous.p1 = p1;
-                mut_previous.p2 = p2;
-                mut_previous.p3 = p3;
+                mut_previous.p1 = MultiLerp::From(p1);
+                mut_previous.p2 = MultiLerp::From(p2);
+                mut_previous.p3 = MultiLerp::From(p3);
                 mut_previous.rotation = 0.0;
             }
         } else {
             let mut new_real = *self.data.get_real();
-            new_real.p1 = p1;
-            new_real.p2 = p2;
-            new_real.p3 = p3;
+            new_real.p1 = MultiLerp::From(p1);
+            new_real.p2 = MultiLerp::From(p2);
+            new_real.p3 = MultiLerp::From(p3);
             self.data.set(new_real);
         }
     }
@@ -284,17 +320,17 @@ impl Tri {
 
         Self::ensure_counter_clockwise(&mut a, &mut b, &mut c);
 
-        let ab_width = glm::distance(&a, &b);
-        let bc_width = glm::distance(&b, &c);
-        let ca_width = glm::distance(&c, &a);
+        let ab_width = glm::distance(a, b);
+        let bc_width = glm::distance(b, c);
+        let ca_width = glm::distance(c, a);
 
         fn get_distance_to_side(point: &glm::Vec2, p1: &glm::Vec2, p2: &glm::Vec2, side_width: f32) -> f32 {
             ((p2.y - p1.y) * point.x - (p2.x - p1.x) * point.y + p2.x * p1.y - p2.y * p1.x) / side_width
         }
 
-        let ab_distance = get_distance_to_side(point, &a, &b, ab_width);
-        let bc_distance = get_distance_to_side(point, &b, &c, bc_width);
-        let ca_distance = get_distance_to_side(point, &c, &a, ca_width);
+        let ab_distance = get_distance_to_side(point, a, b, ab_width);
+        let bc_distance = get_distance_to_side(point, b, c, bc_width);
+        let ca_distance = get_distance_to_side(point, c, a, ca_width);
         ab_distance.max(bc_distance).max(ca_distance)
     }
 }
@@ -304,6 +340,10 @@ impl Squid for Tri {
         let TriData {
             p1, p2, p3, rotation, color, ..
         } = self.data.get_animated();
+
+        let p1 = p1.reveal();
+        let p2 = p2.reveal();
+        let p3 = p3.reveal();
 
         self.refresh_mesh(ctx.display);
 
@@ -333,7 +373,7 @@ impl Squid for Tri {
             transformation: reach_inside_mat4(&transformation),
             view: view,
             projection: reach_inside_mat4(ctx.projection),
-            color: Into::<[f32; 4]>::into(color)
+            color: Into::<[f32; 4]>::into(color.0)
         };
 
         let mesh = self.mesh.as_ref().unwrap();
@@ -375,7 +415,7 @@ impl Squid for Tri {
     fn interact(&mut self, interaction: &Interaction, camera: &glm::Vec2, _options: &InteractionOptions) -> Capture {
         match interaction {
             Interaction::PreClick => {
-                self.moving = false;
+                self.translate_behavior.moving = false;
                 self.rotating = false;
                 self.moving_point = None;
             }
@@ -384,7 +424,7 @@ impl Squid for Tri {
                 position,
             } => {
                 for (i, corner) in self.get_animated_screen_points(camera).iter().enumerate() {
-                    if glm::distance(position, &corner) <= squid::HANDLE_RADIUS * 2.0 {
+                    if glm::distance(position, corner) <= squid::HANDLE_RADIUS * 2.0 {
                         self.moving_point = Some(i);
                         return Capture::AllowDrag;
                     }
@@ -396,8 +436,8 @@ impl Squid for Tri {
                     return Capture::AllowDrag;
                 }
 
-                if self.is_point_over(&position, camera) {
-                    self.moving = true;
+                if self.is_point_over(position, camera) {
+                    self.translate_behavior.moving = true;
                     return Capture::AllowDrag;
                 }
             }
@@ -408,15 +448,16 @@ impl Squid for Tri {
                     return Capture::RotateSelectedSquids {
                         delta_theta: self.get_delta_rotation(current, camera),
                     };
-                } else if self.moving {
+                } else if self.translate_behavior.moving {
                     return Capture::MoveSelectedSquids { delta: *delta };
                 }
             }
             Interaction::MouseRelease { button: MouseButton::Left, .. } => {
                 self.rotating = false;
                 self.moving_point = None;
-                self.translation_accumulator.clear();
+                self.translate_behavior.accumulator.clear();
                 self.rotation_accumulator.clear();
+                self.revolve_behavior.unset();
             }
             _ => (),
         }
@@ -426,18 +467,20 @@ impl Squid for Tri {
     fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool {
         let real = self.data.get_real();
         let center = self.get_real_center();
-        let p1 = glm::rotate_vec2(&(real.p1 - center), -real.rotation) + center + camera;
-        let p2 = glm::rotate_vec2(&(real.p2 - center), -real.rotation) + center + camera;
-        let p3 = glm::rotate_vec2(&(real.p3 - center), -real.rotation) + center + camera;
+        let p1 = glm::rotate_vec2(&(real.p1.reveal() - center), -real.rotation) + center + camera;
+        let p2 = glm::rotate_vec2(&(real.p2.reveal() - center), -real.rotation) + center + camera;
+        let p3 = glm::rotate_vec2(&(real.p3.reveal() - center), -real.rotation) + center + camera;
         Self::is_point_inside_triangle(underneath, &p1, &p2, &p3)
     }
 
     fn translate(&mut self, raw_delta: &glm::Vec2, options: &InteractionOptions) {
-        if let Some(delta) = self.translation_accumulator.accumulate(raw_delta, options.translation_snapping) {
+        let delta = self.translate_behavior.express(raw_delta, options);
+
+        if delta != glm::zero::<glm::Vec2>() {
             let mut new_data = *self.data.get_real();
-            new_data.p1 += delta;
-            new_data.p2 += delta;
-            new_data.p3 += delta;
+            new_data.p1 = MultiLerp::Linear(new_data.p1.reveal() + delta);
+            new_data.p2 = MultiLerp::Linear(new_data.p2.reveal() + delta);
+            new_data.p3 = MultiLerp::Linear(new_data.p3.reveal() + delta);
             self.data.set(new_data);
         }
     }
@@ -453,10 +496,36 @@ impl Squid for Tri {
     fn scale(&mut self, total_scale_factor: f32, _options: &InteractionOptions) {
         let center = self.get_real_center();
         let mut new_data = *self.data.get_real();
-        new_data.p1 = (self.prescale_size[0] * total_scale_factor) + center;
-        new_data.p2 = (self.prescale_size[1] * total_scale_factor) + center;
-        new_data.p3 = (self.prescale_size[2] * total_scale_factor) + center;
+        new_data.p1 = MultiLerp::Linear((self.prescale_size[0] * total_scale_factor) + center);
+        new_data.p2 = MultiLerp::Linear((self.prescale_size[1] * total_scale_factor) + center);
+        new_data.p3 = MultiLerp::Linear((self.prescale_size[2] * total_scale_factor) + center);
         self.data.set(new_data);
+    }
+
+    fn spread(&mut self, point: &glm::Vec2, _options: &InteractionOptions) {
+        let new_position = self.spread_behavior.express(point);
+        let delta = new_position - self.get_real_center();
+
+        let mut new_data = *self.data.get_real();
+        new_data.p1 = MultiLerp::Linear(new_data.p1.reveal() + delta);
+        new_data.p2 = MultiLerp::Linear(new_data.p2.reveal() + delta);
+        new_data.p3 = MultiLerp::Linear(new_data.p3.reveal() + delta);
+        self.data.set(new_data);
+    }
+
+    fn revolve(&mut self, current: &glm::Vec2, options: &InteractionOptions) {
+        if let Some(expression) = self.revolve_behavior.express(current, options) {
+            let center = self.get_animated_center();
+            let new_center = expression.apply_origin_rotation_to_center();
+            let delta_position = new_center - center;
+            let animated_data = self.data.get_animated();
+            let mut new_data = *self.data.get_real();
+            new_data.p1 = MultiLerp::Linear(animated_data.p1.reveal() + delta_position); //, expression.origin);
+            new_data.p2 = MultiLerp::Linear(animated_data.p2.reveal() + delta_position); //, expression.origin);
+            new_data.p3 = MultiLerp::Linear(animated_data.p3.reveal() + delta_position); //, expression.origin);
+            new_data.rotation += expression.delta_object_rotation;
+            self.data.set(new_data);
+        }
     }
 
     fn try_select(&self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection> {
@@ -464,7 +533,7 @@ impl Squid for Tri {
             Some(NewSelection {
                 selection: Selection::new(self_reference, None),
                 info: NewSelectionInfo {
-                    color: Some(self.data.get_real().color),
+                    color: Some(self.data.get_real().color.0),
                 },
             })
         } else {
@@ -473,7 +542,7 @@ impl Squid for Tri {
     }
 
     fn select(&mut self) {
-        self.moving = true;
+        self.translate_behavior.moving = true;
     }
 
     fn try_context_menu(&self, underneath: &glm::Vec2, camera: &glm::Vec2, _self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu> {
@@ -486,15 +555,15 @@ impl Squid for Tri {
 
     fn set_color(&mut self, color: Color) {
         let mut new_data = *self.data.get_real();
-        new_data.color = color;
+        new_data.color = NoLerp(color);
         self.data.set(new_data);
     }
 
     fn duplicate(&self, offset: &glm::Vec2) -> Box<dyn Squid> {
         let mut real = *self.data.get_real();
-        real.p1 += offset;
-        real.p2 += offset;
-        real.p3 += offset;
+        real.p1 = MultiLerp::From(real.p1.reveal() + offset);
+        real.p2 = MultiLerp::From(real.p2.reveal() + offset);
+        real.p3 = MultiLerp::From(real.p3.reveal() + offset);
         Box::new(Self::from_data(real))
     }
 
@@ -504,16 +573,24 @@ impl Squid for Tri {
 
     fn initiate(&mut self, initiation: Initiation) {
         match initiation {
-            Initiation::Translation => {
-                self.moving = true;
+            Initiation::Translate => {
+                self.translate_behavior.moving = true;
                 self.moving_point = None;
             }
-            Initiation::Rotation => (),
+            Initiation::Rotate => (),
             Initiation::Scale => {
                 let real = self.data.get_real();
                 let center = self.get_real_center();
-                self.prescale_size = [real.p1 - center, real.p2 - center, real.p3 - center];
+                self.prescale_size = [real.p1.reveal() - center, real.p2.reveal() - center, real.p3.reveal() - center];
             }
+            Initiation::Spread { point, center } => {
+                self.spread_behavior = SpreadBehavior {
+                    point,
+                    origin: center,
+                    start: self.get_center(),
+                };
+            }
+            Initiation::Revolve { point, center } => self.revolve_behavior.set(&center, &self.get_center(), &point),
         }
     }
 
@@ -521,12 +598,8 @@ impl Squid for Tri {
         self.get_animated_center()
     }
 
-    fn get_name<'a>(&'a self) -> &'a str {
-        if let Some(name) = &self.name {
-            name
-        } else {
-            "Unnamed Tri"
-        }
+    fn get_name(&self) -> &str {
+        self.name.as_deref().unwrap_or("Unnamed Tri")
     }
 
     fn set_name(&mut self, name: String) {
@@ -535,6 +608,11 @@ impl Squid for Tri {
 
     fn get_opaque_handles(&self) -> Vec<glm::Vec2> {
         let data = self.data.get_animated();
-        vec![data.p1, data.p2, data.p3, self.get_rotate_handle_location(&glm::zero())]
+        vec![
+            data.p1.reveal(),
+            data.p2.reveal(),
+            data.p3.reveal(),
+            self.get_rotate_handle_location(&glm::zero()),
+        ]
     }
 }

@@ -1,5 +1,6 @@
 use nalgebra_glm as glm;
 
+#[derive(Copy, Clone, Default)]
 pub struct Accumulator<T: Accumulatable> {
     value: T,
 }
@@ -17,7 +18,7 @@ impl<T: Accumulatable> Accumulator<T> {
         self.value.accumulate(other, threshold)
     }
 
-    pub fn residue<'a>(&'a self) -> &'a T {
+    pub fn residue(&self) -> &T {
         &self.value
     }
 }

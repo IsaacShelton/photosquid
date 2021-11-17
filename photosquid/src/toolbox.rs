@@ -7,8 +7,10 @@ use crate::{
     ocean::{Ocean, Selection},
     options,
     options::color_picker::ColorPicker,
+    press_animation::PressAnimation,
     render_ctx::RenderCtx,
     smooth::Smooth,
+    tool,
     tool::{Tool, ToolKey},
     tool_button::ToolButton,
     ColorScheme,
@@ -52,41 +54,39 @@ impl ToolBox {
     pub fn create_standard_tools(&mut self, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>, display: &Display) {
         // Create tools and corresponding tool buttons
 
-        use crate::{press_animation::DeformPressAnimation, tool};
-
         self.add_tool_button(ToolButton::new(
             include_str!("_src_objs/pointer.obj"),
-            Box::new(DeformPressAnimation {}),
-            tools.insert(tool::Pointer::new()),
-            &display,
+            PressAnimation::Deform,
+            tools.insert(Box::new(tool::Pointer::new())),
+            display,
         ));
 
         self.add_tool_button(ToolButton::new(
             include_str!("_src_objs/pan.obj"),
-            Box::new(DeformPressAnimation {}),
-            tools.insert(tool::Pan::new()),
-            &display,
+            PressAnimation::Deform,
+            tools.insert(Box::new(tool::Pan::new())),
+            display,
         ));
 
         self.add_tool_button(ToolButton::new(
             include_str!("_src_objs/rectangle.obj"),
-            Box::new(DeformPressAnimation {}),
-            tools.insert(tool::Rect::new()),
-            &display,
+            PressAnimation::Deform,
+            tools.insert(Box::new(tool::Rect::new())),
+            display,
         ));
 
         self.add_tool_button(ToolButton::new(
             include_str!("_src_objs/triangle.obj"),
-            Box::new(DeformPressAnimation {}),
-            tools.insert(tool::Tri::new()),
-            &display,
+            PressAnimation::Deform,
+            tools.insert(Box::new(tool::Tri::new())),
+            display,
         ));
 
         self.add_tool_button(ToolButton::new(
             include_str!("_src_objs/circle.obj"),
-            Box::new(DeformPressAnimation {}),
-            tools.insert(tool::Circle::new()),
-            &display,
+            PressAnimation::Deform,
+            tools.insert(Box::new(tool::Circle::new())),
+            display,
         ));
 
         // Select first tool
@@ -94,20 +94,18 @@ impl ToolBox {
     }
 
     pub fn create_standard_options_tabs(&mut self, tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>, display: &Display) {
-        use crate::press_animation::DeformPressAnimation;
-
         self.add_options_tab_button(options::TabButton::new(
             include_str!("_src_objs/object.obj"),
-            Box::new(DeformPressAnimation {}),
-            tabs.insert(options::tab::Object::new()),
-            &display,
+            PressAnimation::Deform,
+            tabs.insert(Box::new(options::tab::Object::new())),
+            display,
         ));
 
         self.add_options_tab_button(options::TabButton::new(
             include_str!("_src_objs/layers.obj"),
-            Box::new(DeformPressAnimation {}),
-            tabs.insert(options::tab::Layers::new()),
-            &display,
+            PressAnimation::Deform,
+            tabs.insert(Box::new(options::tab::Layers::new())),
+            display,
         ));
 
         self.select_tab(0);
@@ -266,8 +264,7 @@ impl ToolBox {
 
     fn calculate_stripe_height(&self) -> f32 {
         let num_buttons = self.buttons.len();
-        let stripe_height = (num_buttons as f32) * self.icon_size + (num_buttons as f32 - 1.0).max(0.0) * self.padding;
-        stripe_height
+        (num_buttons as f32) * self.icon_size + (num_buttons as f32 - 1.0).max(0.0) * self.padding
     }
 
     fn calculate_beginning_x(&self, window_width: f32) -> f32 {
@@ -280,14 +277,14 @@ impl ToolBox {
 
     fn calculate_stripe_width(&self) -> f32 {
         let num_buttons = self.options_tab_buttons.len();
-        let stripe_width = (num_buttons as f32) * self.icon_size + (num_buttons as f32 - 1.0).max(0.0) * self.padding;
-        stripe_width
+        (num_buttons as f32) * self.icon_size + (num_buttons as f32 - 1.0).max(0.0) * self.padding
     }
 
     pub fn get_selected(&self) -> Option<ToolKey> {
         Some(self.buttons.get(self.selection.external_index)?.key)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn render(
         &mut self,
         ctx: &mut RenderCtx,
@@ -297,7 +294,7 @@ impl ToolBox {
         text_system: &TextSystem,
         font: Rc<FontTexture>,
         ocean: &mut Ocean,
-        selections: &Vec<Selection>,
+        selections: &[Selection],
     ) {
         // Background
         ctx.ribbon_mesh.render(ctx, 0.0, 0.0, self.full_width, ctx.height, &color_scheme.dark_ribbon);

@@ -42,13 +42,6 @@ impl TextInput {
         }
     }
 
-    pub fn standard_area(position: &glm::Vec2) -> AABB {
-        let width = 176.0;
-        let height = (16.0 * 0.8) + 30.0;
-        let height = height * 0.8;
-        AABB::new(position.x, position.y, width, height)
-    }
-
     pub fn click(&mut self, _button: MouseButton, position: &glm::Vec2, area: &AABB) -> Capture {
         let was_focused = self.focused;
         self.focused = area.intersecting_point(position.x, position.y);
@@ -59,7 +52,7 @@ impl TextInput {
             if self.just_focused {
                 self.pre_edit = self.text.clone();
             }
-            Capture::NoDrag
+            Capture::TakeFocus
         } else {
             self.ensure_not_empty();
 
@@ -95,9 +88,7 @@ impl TextInput {
         }
 
         if virtual_keycode == VirtualKeyCode::Return {
-            self.focused = false;
-            self.has_new_content = true;
-            self.ensure_not_empty();
+            self.unfocus();
             return KeyCapture::Capture;
         }
 
@@ -112,13 +103,34 @@ impl TextInput {
         KeyCapture::Miss
     }
 
+    pub fn unfocus(&mut self) {
+        if self.focused {
+            self.focused = false;
+            self.has_new_content = true;
+            self.ensure_not_empty();
+        }
+    }
+
+    pub fn render(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>, area: &AABB) {
+        self.render_background(ctx, area);
+        self.render_text(ctx, text_system, font.clone(), area);
+        self.render_label(ctx, text_system, font, area);
+    }
+
+    pub fn standard_area(position: &glm::Vec2) -> AABB {
+        let width = 176.0;
+        let height = (16.0 * 0.8) + 30.0;
+        let height = height * 0.8;
+        AABB::new(position.x, position.y, width, height)
+    }
+
     fn type_character(&mut self, character: char) {
         self.text.push(character);
         self.text_display = None;
     }
 
     fn backspace(&mut self) {
-        if self.text.len() > 0 {
+        if !self.text.is_empty() {
             self.text.pop();
             self.text_display = None;
         }
@@ -129,19 +141,13 @@ impl TextInput {
         self.text_display = None;
     }
 
-    pub fn poll<'a>(&'a mut self) -> Option<&'a str> {
+    pub fn poll(&mut self) -> Option<&str> {
         if self.has_new_content {
             self.has_new_content = false;
             Some(&self.text)
         } else {
             None
         }
-    }
-
-    pub fn render(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>, area: &AABB) {
-        self.render_background(ctx, area);
-        self.render_text(ctx, text_system, font.clone(), area);
-        self.render_label(ctx, text_system, font, area);
     }
 
     fn render_background(&self, ctx: &mut RenderCtx, area: &AABB) {
@@ -213,8 +219,6 @@ impl TextInput {
             ctx,
             Color::from_hex("#777777"),
         );
-
-        return;
     }
 
     pub fn is_focused(&self) -> bool {
@@ -230,10 +234,7 @@ impl TextInput {
     }
 
     fn to_character(virtual_keycode: VirtualKeyCode, mappings: &HashMap<VirtualKeyCode, char>) -> Option<char> {
-        match mappings.get(&virtual_keycode) {
-            Some(c) => Some(*c),
-            None => None,
-        }
+        mappings.get(&virtual_keycode).copied()
     }
 
     fn ensure_not_empty(&mut self) {

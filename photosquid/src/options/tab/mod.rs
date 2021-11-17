@@ -20,5 +20,5 @@ new_key_type! { pub struct TabKey; }
 pub trait Tab {
     fn interact(&mut self, interaction: Interaction, app: &mut ApplicationState) -> Capture;
 
-    fn render(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>, ocean: &mut Ocean, selections: &Vec<Selection>);
+    fn render(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>, ocean: &mut Ocean, selections: &[Selection]);
 }

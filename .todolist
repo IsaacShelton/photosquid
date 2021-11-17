@@ -1,0 +1,38 @@
+- zoom in/out
+- translate/rotate/scale as group
+- box select with pointer tool
+- select all/none (with context menu on pointer tool for empty space)
+- find way to have shortcut 'c' for "treat selection as group" and be visible to user
+- cmd+] and cmd+[ to move layers up/down
+- ability to rearrange layers by dragging them in the layers panel
+- multiple layers
+- rearranging layers
+- gradients
+- beziér curves
+- paths
+- complex shapes
+- shape and/or/xor
+- ability to round corners
+- convert shapes to path
+- approximate path with shape
+- groups
+- borders
+- variations of borders
+- star shape
+- polygon shape
+- save file .photosquid
+- open file .photosquid
+- export to png
+- export to svg
+- freehand tool
+- pen tool
+- combine shapes into shape tool
+- object properties
+- lines 
+- text tool
+- eyedropper
+- hover info for tools buttons (e.g. name, description, and hotkey)
+- arcs (and inner arc radius)
+- color palettes
+- option to not rotate objects when revolving
+- cw ordering for circle lerp

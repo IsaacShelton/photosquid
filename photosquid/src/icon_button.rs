@@ -11,17 +11,17 @@ pub struct IconButton<T> {
     relative_scale: f32,
     instant: Option<Instant>,
     duration: Duration,
-    animation: Box<dyn PressAnimation>,
+    animation: PressAnimation,
     focused: bool,
     color: Option<Smooth<Color>>,
 }
 
 impl<T> IconButton<T> {
-    pub fn new(obj_src_code: &str, animation: Box<dyn PressAnimation>, key: T, display: &Display) -> Self {
+    pub fn new(obj_src_code: &str, animation: PressAnimation, key: T, display: &Display) -> Self {
         Self::new_from_mesh(MeshXyz::new(obj_src_code, display), animation, key)
     }
 
-    pub fn new_from_mesh(mesh: MeshXyz, animation: Box<dyn PressAnimation>, key: T) -> Self {
+    pub fn new_from_mesh(mesh: MeshXyz, animation: PressAnimation, key: T) -> Self {
         Self {
             mesh,
             position: glm::vec3(0.0, 0.0, 0.0),

@@ -2,19 +2,23 @@ use super::{Initiation, Squid, SquidRef};
 use crate::{
     accumulator::Accumulator,
     algorithm,
-    app::InteractionOptions,
     capture::Capture,
     color::Color,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
     interaction::Interaction,
-    math_helpers::DivOrZero,
+    interaction_options::InteractionOptions,
+    math_helpers::{angle_difference, DivOrZero},
     matrix_helpers::reach_inside_mat4,
     mesh::MeshXyz,
     ocean::{NewSelection, NewSelectionInfo, Selection},
     render_ctx::RenderCtx,
-    smooth::{Lerpable, Smooth},
-    squid::{self, PreviewParams},
+    smooth::{Lerpable, MultiLerp, NoLerp, Smooth},
+    squid::{
+        self,
+        behavior::{RevolveBehavior, SpreadBehavior, TranslateBehavior},
+        PreviewParams,
+    },
 };
 use glium::glutin::event::MouseButton;
 use nalgebra_glm as glm;
@@ -26,22 +30,34 @@ pub struct Rect {
     created: Instant,
     mesh: Option<MeshXyz>,
 
-    // Tweaking parameters
+    // --------- Tweaking parameters ---------
+
+    // Move point
     moving_corner: Option<CornerKind>,
-    moving: bool,
+
+    // Translate
+    translate_behavior: TranslateBehavior,
+
+    // Rotate
     rotating: bool,
-    translation_accumulator: Accumulator<glm::Vec2>,
     rotation_accumulator: Accumulator<f32>,
+
+    // Scale
     prescale_size: glm::Vec2,
+
+    // Spread
+    spread_behavior: SpreadBehavior,
+
+    // Revolve
+    revolve_behavior: RevolveBehavior,
 }
 
 #[derive(Copy, Clone)]
 pub struct RectData {
-    x: f32,
-    y: f32,
+    position: MultiLerp<glm::Vec2>,
     w: f32,
     h: f32,
-    color: Color,
+    color: NoLerp<Color>,
     rotation: f32,
 }
 
@@ -50,8 +66,7 @@ impl Lerpable for RectData {
 
     fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
         Self {
-            x: interpolation::Lerp::lerp(&self.x, &other.x, scalar),
-            y: interpolation::Lerp::lerp(&self.y, &other.y, scalar),
+            position: self.position.lerp(&other.position, scalar),
             w: interpolation::Lerp::lerp(&self.w, &other.w, scalar),
             h: interpolation::Lerp::lerp(&self.h, &other.h, scalar),
             rotation: interpolation::Lerp::lerp(&self.rotation, &other.rotation, scalar),
@@ -92,12 +107,11 @@ fn get_corner_dependence(moving: CornerKind, dependent: CornerKind) -> CornerDep
 impl Rect {
     pub fn new(x: f32, y: f32, w: f32, h: f32, rotation: f32, color: Color) -> Self {
         let data = RectData {
-            x,
-            y,
+            position: MultiLerp::From(glm::vec2(x, y)),
             w,
             h,
-            rotation: rotation,
-            color,
+            rotation,
+            color: NoLerp(color),
         };
 
         Self::from_data(data)
@@ -110,11 +124,12 @@ impl Rect {
             created: Instant::now(),
             mesh: None,
             moving_corner: None,
-            moving: false,
+            translate_behavior: Default::default(),
             rotating: false,
-            translation_accumulator: Accumulator::new(),
             rotation_accumulator: Accumulator::new(),
             prescale_size: glm::vec2(data.w, data.h),
+            spread_behavior: Default::default(),
+            revolve_behavior: Default::default(),
         }
     }
 
@@ -137,17 +152,20 @@ impl Rect {
     }
 
     fn get_world_corners(&self) -> Vec<glm::Vec2> {
-        let RectData { x, y, .. } = self.data.get_animated();
-
-        self.get_relative_corners().iter().map(|p| glm::vec2(p.x + x, p.y + y)).collect()
-    }
-
-    fn get_screen_corners(&self, camera: &glm::Vec2) -> Vec<glm::Vec2> {
-        let RectData { x, y, .. } = self.data.get_animated();
+        let RectData { position, .. } = self.data.get_animated();
 
         self.get_relative_corners()
             .iter()
-            .map(|p| glm::vec2(p.x + x + camera.x, p.y + y + camera.y))
+            .map(|p| glm::vec2(p.x + position.reveal().x, p.y + position.reveal().y))
+            .collect()
+    }
+
+    fn get_screen_corners(&self, camera: &glm::Vec2) -> Vec<glm::Vec2> {
+        let RectData { position, .. } = self.data.get_animated();
+
+        self.get_relative_corners()
+            .iter()
+            .map(|p| glm::vec2(p.x + position.reveal().x + camera.x, p.y + position.reveal().y + camera.y))
             .collect()
     }
 
@@ -158,11 +176,11 @@ impl Rect {
         let real = self.data.get_real();
         let moving_corner = self.moving_corner.unwrap();
         let relative_corners = self.get_relative_corners();
-        let target_position = *target_screen_position - camera - glm::vec2(real.x, real.y);
+        let target_position = *target_screen_position - camera - glm::vec2(real.position.reveal().x, real.position.reveal().y);
 
         // Rotate corners back into axis-aligned space
         let rotation = real.rotation;
-        let axis_aligned_relative_corners: Vec<glm::Vec2> = relative_corners.iter().map(|p| glm::rotate_vec2(&p, rotation)).collect();
+        let axis_aligned_relative_corners: Vec<glm::Vec2> = relative_corners.iter().map(|p| glm::rotate_vec2(p, rotation)).collect();
         let axis_aligned_target_position = glm::rotate_vec2(&target_position, rotation);
 
         let mut result: Vec<glm::Vec2> = vec![];
@@ -197,27 +215,34 @@ impl Rect {
 
     fn get_delta_rotation(&self, mouse_position: &glm::Vec2, camera: &glm::Vec2) -> f32 {
         let real = self.data.get_real();
-        let screen_x = real.x + camera.x;
-        let screen_y = real.y + camera.y;
+        let screen_x = real.position.reveal().x + camera.x;
+        let screen_y = real.position.reveal().y + camera.y;
 
         let old_rotation = real.rotation + self.rotation_accumulator.residue();
         let new_rotation = -1.0 * (mouse_position.y - screen_y).atan2(mouse_position.x - screen_x) + if real.w < 0.0 { std::f32::consts::PI } else { 0.0 };
-        return squid::angle_difference(old_rotation, new_rotation);
+
+        angle_difference(old_rotation, new_rotation)
     }
 
     fn get_rotate_handle_location(&self, camera: &glm::Vec2) -> glm::Vec2 {
-        let RectData { x, y, w, rotation, .. } = self.data.get_animated();
+        let RectData { position, w, rotation, .. } = self.data.get_animated();
 
         glm::vec2(
-            x + camera.x + rotation.cos() * (w * 0.5 + 24.0 * w.signum()),
-            y + camera.y - rotation.sin() * (w * 0.5 + 24.0 * w.signum()),
+            position.reveal().x + camera.x + rotation.cos() * (w * 0.5 + 24.0 * w.signum()),
+            position.reveal().y + camera.y - rotation.sin() * (w * 0.5 + 24.0 * w.signum()),
         )
     }
 }
 
 impl Squid for Rect {
     fn render(&mut self, ctx: &mut RenderCtx, as_preview: Option<PreviewParams>) {
-        let RectData { x, y, w, h, rotation, color } = self.data.get_animated();
+        let RectData {
+            position,
+            w,
+            h,
+            rotation,
+            color,
+        } = self.data.get_animated();
 
         if self.mesh.is_none() {
             self.mesh = Some(MeshXyz::new_shape_square(ctx.display));
@@ -226,7 +251,7 @@ impl Squid for Rect {
         let mut transformation = if let Some(preview) = &as_preview {
             glm::translation(&glm::vec2_to_vec3(&preview.position))
         } else {
-            glm::translation(&glm::vec3(x, y, 0.0))
+            glm::translation(&glm::vec3(position.reveal().x, position.reveal().y, 0.0))
         };
 
         transformation = glm::rotate(&transformation, rotation, &glm::vec3(0.0, 0.0, -1.0));
@@ -248,7 +273,7 @@ impl Squid for Rect {
             transformation: reach_inside_mat4(&transformation),
             view: view,
             projection: reach_inside_mat4(ctx.projection),
-            color: Into::<[f32; 4]>::into(color)
+            color: Into::<[f32; 4]>::into(color.0)
         };
 
         let mesh = self.mesh.as_ref().unwrap();
@@ -258,7 +283,9 @@ impl Squid for Rect {
 
     fn render_selected_indication(&self, ctx: &mut RenderCtx) {
         let camera = ctx.camera;
-        let RectData { x, y, .. } = self.data.get_animated();
+        let RectData { position, .. } = self.data.get_animated();
+        let x = position.reveal().x;
+        let y = position.reveal().y;
 
         ctx.ring_mesh.render(
             ctx,
@@ -295,7 +322,7 @@ impl Squid for Rect {
     fn interact(&mut self, interaction: &Interaction, camera: &glm::Vec2, _options: &InteractionOptions) -> Capture {
         match interaction {
             Interaction::PreClick => {
-                self.moving = false;
+                self.translate_behavior.moving = false;
                 self.rotating = false;
                 self.moving_corner = None;
             }
@@ -304,7 +331,7 @@ impl Squid for Rect {
                 position,
             } => {
                 for (i, corner) in self.get_screen_corners(camera).iter().enumerate() {
-                    if glm::distance(position, &corner) <= squid::HANDLE_RADIUS * 2.0 {
+                    if glm::distance(position, corner) <= squid::HANDLE_RADIUS * 2.0 {
                         self.moving_corner = Some(Self::get_corner_kind(i));
                         return Capture::AllowDrag;
                     }
@@ -316,8 +343,8 @@ impl Squid for Rect {
                     return Capture::AllowDrag;
                 }
 
-                if self.is_point_over(&position, camera) {
-                    self.moving = true;
+                if self.is_point_over(position, camera) {
+                    self.translate_behavior.moving = true;
                     return Capture::AllowDrag;
                 }
             }
@@ -328,14 +355,14 @@ impl Squid for Rect {
                     return Capture::RotateSelectedSquids {
                         delta_theta: self.get_delta_rotation(current, camera),
                     };
-                } else if self.moving {
+                } else if self.translate_behavior.moving {
                     return Capture::MoveSelectedSquids { delta: *delta };
                 }
             }
             Interaction::MouseRelease { button: MouseButton::Left, .. } => {
                 self.rotating = false;
                 self.moving_corner = None;
-                self.translation_accumulator.clear();
+                self.translate_behavior.accumulator.clear();
                 self.rotation_accumulator.clear();
             }
             _ => (),
@@ -345,10 +372,11 @@ impl Squid for Rect {
     }
 
     fn translate(&mut self, raw_delta: &glm::Vec2, options: &InteractionOptions) {
-        if let Some(delta) = self.translation_accumulator.accumulate(raw_delta, options.translation_snapping) {
+        let delta = self.translate_behavior.express(raw_delta, options);
+
+        if delta != glm::zero::<glm::Vec2>() {
             let mut new_data = *self.data.get_real();
-            new_data.x += delta.x;
-            new_data.y += delta.y;
+            new_data.position = MultiLerp::Linear(new_data.position.reveal() + delta);
             self.data.set(new_data);
         }
     }
@@ -368,12 +396,31 @@ impl Squid for Rect {
         self.data.set(new_data);
     }
 
+    fn spread(&mut self, point: &glm::Vec2, _options: &InteractionOptions) {
+        let new_position = self.spread_behavior.express(point);
+
+        let mut new_data = *self.data.get_real();
+        new_data.position = MultiLerp::Linear(new_position);
+        self.data.set(new_data);
+    }
+
+    fn revolve(&mut self, current: &glm::Vec2, options: &InteractionOptions) {
+        if let Some(expression) = self.revolve_behavior.express(current, options) {
+            let mut new_data = *self.data.get_real();
+
+            let new_center = expression.apply_origin_rotation_to_center();
+            new_data.position = MultiLerp::Circle(new_center, expression.origin);
+            new_data.rotation += expression.delta_object_rotation;
+            self.data.set(new_data);
+        }
+    }
+
     fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool {
         let real = self.data.get_real();
         let corners: Vec<glm::Vec2> = self
             .get_relative_corners()
             .iter()
-            .map(|&p| glm::vec2(real.x + camera.x + p.x, real.y + camera.y + p.y))
+            .map(|&p| glm::vec2(real.position.reveal().x + camera.x + p.x, real.position.reveal().y + camera.y + p.y))
             .collect();
 
         assert_eq!(corners.len(), 4);
@@ -385,7 +432,7 @@ impl Squid for Rect {
             Some(NewSelection {
                 selection: Selection::new(self_reference, None),
                 info: NewSelectionInfo {
-                    color: Some(self.data.get_real().color),
+                    color: Some(self.data.get_real().color.0),
                 },
             })
         } else {
@@ -394,7 +441,7 @@ impl Squid for Rect {
     }
 
     fn select(&mut self) {
-        self.moving = true;
+        self.translate_behavior.moving = true;
     }
 
     fn try_context_menu(&self, underneath: &glm::Vec2, camera: &glm::Vec2, _self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu> {
@@ -407,14 +454,13 @@ impl Squid for Rect {
 
     fn set_color(&mut self, color: Color) {
         let mut new_data = *self.data.get_real();
-        new_data.color = color;
+        new_data.color = NoLerp(color);
         self.data.set(new_data);
     }
 
     fn duplicate(&self, offset: &glm::Vec2) -> Box<dyn Squid> {
         let mut real = *self.data.get_real();
-        real.x += offset.x;
-        real.y += offset.y;
+        real.position = MultiLerp::From(real.position.reveal() + offset);
         Box::new(Self::from_data(real))
     }
 
@@ -424,29 +470,33 @@ impl Squid for Rect {
 
     fn initiate(&mut self, initiation: Initiation) {
         match initiation {
-            Initiation::Translation => {
-                self.moving = true;
+            Initiation::Translate => {
+                self.translate_behavior.moving = true;
                 self.moving_corner = None;
             }
-            Initiation::Rotation => (),
+            Initiation::Rotate => (),
             Initiation::Scale => {
                 let real = self.data.get_real();
                 self.prescale_size = glm::vec2(real.w, real.h);
             }
+            Initiation::Spread { point, center } => {
+                self.spread_behavior = SpreadBehavior {
+                    point,
+                    origin: center,
+                    start: self.get_center(),
+                };
+            }
+            Initiation::Revolve { point, center } => self.revolve_behavior.set(&center, &self.get_center(), &point),
         }
     }
 
     fn get_center(&self) -> glm::Vec2 {
-        let RectData { x, y, .. } = self.data.get_animated();
-        glm::vec2(x, y)
+        let RectData { position, .. } = self.data.get_animated();
+        position.reveal()
     }
 
-    fn get_name<'a>(&'a self) -> &'a str {
-        if let Some(name) = &self.name {
-            name
-        } else {
-            "Unnamed Rect"
-        }
+    fn get_name(&self) -> &str {
+        self.name.as_deref().unwrap_or("Unnamed Rect")
     }
 
     fn set_name(&mut self, name: String) {

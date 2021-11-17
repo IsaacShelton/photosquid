@@ -25,6 +25,7 @@ pub enum ContextAction {
     GrabSelected,
     RotateSelected,
     ScaleSelected,
+    Collectively,
 }
 
 impl ContextMenu {
@@ -98,7 +99,7 @@ impl ContextMenu {
             let transformation = glm::translate(&transformation, &glm::vec3(16.0, (16.0 * 0.8) + 30.0 * i as f32, 0.0));
             let transformation = glm::scale(&transformation, &glm::vec3(16.0, -16.0, 0.0));
             let matrix = ctx.projection * transformation;
-            ctx.draw_text(&text_display, text_system, matrix, (1.0, 1.0, 1.0, 1.0)).unwrap();
+            ctx.draw_text(text_display, text_system, matrix, (1.0, 1.0, 1.0, 1.0)).unwrap();
 
             // Draw friendly shortcut
             let text_display = option.get_shortcut_display(text_system, font.clone());
@@ -109,7 +110,7 @@ impl ContextMenu {
             );
             let transformation = glm::scale(&transformation, &glm::vec3(16.0, -16.0, 0.0));
             let matrix = ctx.projection * transformation;
-            ctx.draw_text(&text_display, text_system, matrix, (0.5, 0.5, 0.5, 1.0)).unwrap();
+            ctx.draw_text(text_display, text_system, matrix, (0.5, 0.5, 0.5, 1.0)).unwrap();
         }
     }
 }

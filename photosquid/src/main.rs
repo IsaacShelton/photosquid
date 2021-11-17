@@ -3,14 +3,17 @@
 mod aabb;
 mod accumulator;
 mod algorithm;
+mod annotations;
 mod app;
 mod capture;
+mod checkbox;
 mod color;
 mod color_impls;
 mod color_scheme;
 mod context_menu;
 mod icon_button;
 mod interaction;
+mod interaction_options;
 mod layer;
 mod math_helpers;
 mod matrix_helpers;
@@ -28,6 +31,7 @@ mod text_input;
 mod tool;
 mod tool_button;
 mod toolbox;
+mod user_input;
 mod vertex;
 
 const TARGET_FPS: u64 = 60;
@@ -102,6 +106,7 @@ fn main() {
 
     let ribbon_mesh = MeshXyz::new_ui_rect(&display);
     let ring_mesh = MeshXyz::new_ui_ring(&display);
+    let check_mesh = MeshXyz::new_ui_check(&display);
     let square_xyzuv = MeshXyzUv::new_square(&display);
 
     let color_shader_program = shader_helpers::shader_from_source_that_outputs_srgb(
@@ -179,6 +184,7 @@ fn main() {
         toolbox,
         ribbon_mesh,
         ring_mesh,
+        check_mesh,
         square_xyzuv,
         color_shader_program,
         hue_value_picker_shader_program,
@@ -201,9 +207,10 @@ fn main() {
         font: Rc::new(font),
         context_menu: None,
         numeric_mappings,
-        interaction_options: InteractionOptions::new(),
+        interaction_options: Default::default(),
         wait_for_stop_drag: false,
         operation: None,
+        perform_next_operation_collectively: false,
     };
 
     event_loop.run(move |abstract_event, _, control_flow| {
@@ -238,9 +245,34 @@ fn main() {
                     match action {
                         ContextAction::DeleteSelected => state.delete_selected(),
                         ContextAction::DuplicateSelected => state.duplicate_selected(),
-                        ContextAction::GrabSelected => state.initiate(Initiation::Translation),
-                        ContextAction::RotateSelected => state.initiate(Initiation::Rotation),
+                        ContextAction::GrabSelected => {
+                            if state.perform_next_operation_collectively {
+                                if let Some(center) = state.get_selection_group_center() {
+                                    state.initiate(Initiation::Spread {
+                                        point: state.get_mouse_in_world_space(),
+                                        center,
+                                    });
+                                }
+                                state.perform_next_operation_collectively = false;
+                            } else {
+                                state.initiate(Initiation::Translate);
+                            }
+                        }
+                        ContextAction::RotateSelected => {
+                            if state.perform_next_operation_collectively {
+                                if let Some(center) = state.get_selection_group_center() {
+                                    state.initiate(Initiation::Revolve {
+                                        point: state.get_mouse_in_world_space(),
+                                        center,
+                                    });
+                                }
+                                state.perform_next_operation_collectively = false;
+                            } else {
+                                state.initiate(Initiation::Rotate);
+                            }
+                        }
                         ContextAction::ScaleSelected => state.initiate(Initiation::Scale),
+                        ContextAction::Collectively => state.perform_next_operation_collectively = !state.perform_next_operation_collectively,
                     }
                     return Capture::NoDrag;
                 }
@@ -260,7 +292,7 @@ fn main() {
                 return tools[tool_key].interact(Interaction::Click { button, position }, state);
             }
 
-            return Capture::Miss;
+            Capture::Miss
         }
 
         fn do_mouse_release(state: &mut ApplicationState, button: MouseButton) {
@@ -347,11 +379,8 @@ fn main() {
                         let logical_position = state.mouse_position.unwrap();
                         dragging.update(glm::vec2(logical_position.x, logical_position.y));
 
-                        match do_drag(&mut state, &mut tools) {
-                            capture => {
-                                state.handle_captured(&capture);
-                            }
-                        }
+                        let capture = do_drag(&mut state, &mut tools);
+                        state.handle_captured(&capture);
                     }
                 }
                 ConcreteWindowEvent::ScaleFactorChanged { scale_factor, .. } => {
@@ -390,11 +419,12 @@ fn main() {
                     rounded_rectangle_shader: &state.rounded_rectangle_shader_program,
                     projection: &state.projection.unwrap(),
                     view: &state.view.unwrap(),
-                    width: width,
-                    height: height,
+                    width,
+                    height,
                     scale_factor: state.scale_factor,
                     ribbon_mesh: &state.ribbon_mesh,
                     ring_mesh: &state.ring_mesh,
+                    check_mesh: &state.check_mesh,
                     square_xyzuv: &state.square_xyzuv,
                     color_scheme: &state.color_scheme,
                     camera: &state.camera.get_animated(),

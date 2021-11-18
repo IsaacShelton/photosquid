@@ -64,6 +64,7 @@ pub struct TriData {
     p1: MultiLerp<glm::Vec2>,
     p2: MultiLerp<glm::Vec2>,
     p3: MultiLerp<glm::Vec2>,
+    center: MultiLerp<glm::Vec2>,
     color: NoLerp<Color>,
     rotation: Rad<f32>,
 }
@@ -76,6 +77,7 @@ impl Lerpable for TriData {
             p1: Lerpable::lerp(&self.p1, &other.p1, scalar),
             p2: Lerpable::lerp(&self.p2, &other.p2, scalar),
             p3: Lerpable::lerp(&self.p3, &other.p3, scalar),
+            center: self.center.lerp(&other.center, scalar),
             rotation: angular_units::Interpolate::interpolate(&self.rotation, &other.rotation, *scalar),
             color: Lerpable::lerp(&self.color, &other.color, scalar),
         }
@@ -84,10 +86,13 @@ impl Lerpable for TriData {
 
 impl Tri {
     pub fn new(p1: glm::Vec2, p2: glm::Vec2, p3: glm::Vec2, rotation: Rad<f32>, color: Color) -> Self {
+        let center = Tri::get_center(&p1, &p2, &p3);
+
         let data = TriData {
-            p1: MultiLerp::From(p1),
-            p2: MultiLerp::From(p2),
-            p3: MultiLerp::From(p3),
+            p1: MultiLerp::From(p1 - center),
+            p2: MultiLerp::From(p2 - center),
+            p3: MultiLerp::From(p3 - center),
+            center: MultiLerp::From(center),
             rotation,
             color: NoLerp(color),
         };
@@ -98,7 +103,7 @@ impl Tri {
         let p1 = &data.p1.reveal();
         let p2 = &data.p2.reveal();
         let p3 = &data.p3.reveal();
-        let center = Self::get_center(p1, p2, p3);
+        let center = &data.center.reveal();
 
         Self {
             name: None,
@@ -153,13 +158,13 @@ impl Tri {
     }
 
     fn get_real_center(&self) -> glm::Vec2 {
-        let TriData { p1, p2, p3, .. } = self.data.get_real();
-        Self::get_center(&p1.reveal(), &p2.reveal(), &p3.reveal())
+        let TriData { center, .. } = self.data.get_real();
+        center.reveal()
     }
 
     fn get_animated_center(&self) -> glm::Vec2 {
-        let TriData { p1, p2, p3, .. } = self.data.get_animated();
-        Self::get_center(&p1.reveal(), &p2.reveal(), &p3.reveal())
+        let TriData { center, .. } = self.data.get_animated();
+        center.reveal()
     }
 
     fn get_center(p1: &glm::Vec2, p2: &glm::Vec2, p3: &glm::Vec2) -> glm::Vec2 {
@@ -170,27 +175,25 @@ impl Tri {
         let TriData { p1, p2, p3, rotation, .. } = self.data.get_animated();
         let center = self.get_animated_center();
 
-        [p1.reveal() - center, p2.reveal() - center, p3.reveal() - center]
+        [p1.reveal(), p2.reveal(), p3.reveal()]
             .iter()
             .map(|p| glm::rotate_vec2(p, -rotation.scalar()) + center + camera)
             .collect()
     }
 
     fn get_rotate_handle_location(&self, camera: &glm::Vec2) -> glm::Vec2 {
-        let center = self.get_animated_center();
-        let TriData { p1, p2, p3, rotation, .. } = self.data.get_animated();
+        let TriData {
+            center, p1, p2, p3, rotation, ..
+        } = self.data.get_animated();
 
         let rotation = rotation + self.virtual_rotation;
         let p1 = p1.reveal();
         let p2 = p2.reveal();
         let p3 = p3.reveal();
+        let center = center.reveal();
 
-        let max_distance = glm::distance(&p1, &center).max(glm::distance(&p2, &center).max(glm::distance(&p3, &center)));
-
-        let first_try = glm::vec2(
-            center.x + camera.x + rotation.cos() * (max_distance + 24.0),
-            center.y + camera.y - rotation.sin() * (max_distance + 24.0),
-        );
+        let max_distance = glm::magnitude(&p1).max(glm::magnitude(&p2)).max(glm::magnitude(&p3));
+        let first_try = center + camera + (max_distance + 24.0) * glm::vec2(rotation.cos(), -rotation.sin());
 
         let screen_points = self.get_animated_screen_points(camera);
         assert_eq!(screen_points.len(), 3);
@@ -199,13 +202,9 @@ impl Tri {
         let r_p2 = &screen_points[1];
         let r_p3 = &screen_points[2];
         let true_distance = Self::get_distance_between_point_and_triangle(&first_try, r_p1, r_p2, r_p3);
-
         let final_distance = (max_distance + 24.0 - true_distance) + 24.0;
 
-        glm::vec2(
-            center.x + camera.x + rotation.cos() * final_distance,
-            center.y + camera.y - rotation.sin() * final_distance,
-        )
+        center + camera + final_distance * glm::vec2(rotation.cos(), -rotation.sin())
     }
 
     fn reposition_point(&mut self, mouse_position: &glm::Vec2, camera: &glm::Vec2) {
@@ -213,11 +212,11 @@ impl Tri {
         let rotation = self.data.get_real().rotation;
         let center = self.get_real_center();
 
-        let mut p1 = glm::rotate_vec2(&(real.p1.reveal() - center), -rotation.scalar());
-        let mut p2 = glm::rotate_vec2(&(real.p2.reveal() - center), -rotation.scalar());
-        let mut p3 = glm::rotate_vec2(&(real.p3.reveal() - center), -rotation.scalar());
+        let mut p1 = glm::rotate_vec2(&real.p1.reveal(), -rotation.scalar());
+        let mut p2 = glm::rotate_vec2(&real.p2.reveal(), -rotation.scalar());
+        let mut p3 = glm::rotate_vec2(&real.p3.reveal(), -rotation.scalar());
 
-        let new_p = glm::rotate_vec2(&(mouse_position - camera - center), 0.0);
+        let new_p = mouse_position - camera - center;
 
         match self.moving_point {
             Some(0) => p1 = new_p,
@@ -226,9 +225,11 @@ impl Tri {
             _ => (),
         }
 
-        p1 += center;
-        p2 += center;
-        p3 += center;
+        let new_center = center + Self::get_center(&p1, &p2, &p3);
+        let delta_center = new_center - center;
+        p1 -= delta_center;
+        p2 -= delta_center;
+        p3 -= delta_center;
 
         // Set new data as the new target points, with zero rotation applied
 
@@ -238,24 +239,27 @@ impl Tri {
 
             {
                 let mut_real = self.data.manual_get_real();
-                mut_real.p1 = MultiLerp::From(p1);
-                mut_real.p2 = MultiLerp::From(p2);
-                mut_real.p3 = MultiLerp::From(p3);
+                mut_real.p1 = MultiLerp::Linear(p1);
+                mut_real.p2 = MultiLerp::Linear(p2);
+                mut_real.p3 = MultiLerp::Linear(p3);
+                mut_real.center = MultiLerp::Linear(new_center);
                 mut_real.rotation = Rad(0.0);
             }
 
             {
                 let mut_previous = self.data.manual_get_previous();
-                mut_previous.p1 = MultiLerp::From(p1);
-                mut_previous.p2 = MultiLerp::From(p2);
-                mut_previous.p3 = MultiLerp::From(p3);
+                mut_previous.p1 = MultiLerp::Linear(p1);
+                mut_previous.p2 = MultiLerp::Linear(p2);
+                mut_previous.p3 = MultiLerp::Linear(p3);
+                mut_previous.center = MultiLerp::Linear(new_center);
                 mut_previous.rotation = Rad(0.0);
             }
         } else {
             let mut new_real = *self.data.get_real();
-            new_real.p1 = MultiLerp::From(p1);
-            new_real.p2 = MultiLerp::From(p2);
-            new_real.p3 = MultiLerp::From(p3);
+            new_real.p1 = MultiLerp::Linear(p1);
+            new_real.p2 = MultiLerp::Linear(p2);
+            new_real.p3 = MultiLerp::Linear(p3);
+            new_real.center = MultiLerp::Linear(new_center);
             self.data.set(new_real);
         }
     }
@@ -328,12 +332,18 @@ impl Tri {
 impl Squid for Tri {
     fn render(&mut self, ctx: &mut RenderCtx, as_preview: Option<PreviewParams>) {
         let TriData {
-            p1, p2, p3, rotation, color, ..
+            center,
+            p1,
+            p2,
+            p3,
+            rotation,
+            color,
+            ..
         } = self.data.get_animated();
 
-        let p1 = p1.reveal();
-        let p2 = p2.reveal();
-        let p3 = p3.reveal();
+        let p1 = p1.reveal() + center.reveal();
+        let p2 = p2.reveal() + center.reveal();
+        let p3 = p3.reveal() + center.reveal();
 
         self.refresh_mesh(ctx.display);
 
@@ -351,7 +361,6 @@ impl Squid for Tri {
         }
 
         transformation = glm::rotate(&transformation, rotation.scalar(), &glm::vec3(0.0, 0.0, -1.0));
-        transformation = glm::translate(&transformation, &glm::vec2_to_vec3(&(-center)));
 
         let view = if as_preview.is_some() {
             reach_inside_mat4(&glm::identity::<f32, 4>())
@@ -467,9 +476,9 @@ impl Squid for Tri {
     fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool {
         let real = self.data.get_real();
         let center = self.get_real_center();
-        let p1 = glm::rotate_vec2(&(real.p1.reveal() - center), -real.rotation.scalar()) + center + camera;
-        let p2 = glm::rotate_vec2(&(real.p2.reveal() - center), -real.rotation.scalar()) + center + camera;
-        let p3 = glm::rotate_vec2(&(real.p3.reveal() - center), -real.rotation.scalar()) + center + camera;
+        let p1 = glm::rotate_vec2(&(real.p1.reveal()), -real.rotation.scalar()) + center + camera;
+        let p2 = glm::rotate_vec2(&(real.p2.reveal()), -real.rotation.scalar()) + center + camera;
+        let p3 = glm::rotate_vec2(&(real.p3.reveal()), -real.rotation.scalar()) + center + camera;
         Self::is_point_inside_triangle(underneath, &p1, &p2, &p3)
     }
 
@@ -478,9 +487,7 @@ impl Squid for Tri {
 
         if delta != glm::zero::<glm::Vec2>() {
             let mut new_data = *self.data.get_real();
-            new_data.p1 = MultiLerp::Linear(new_data.p1.reveal() + delta);
-            new_data.p2 = MultiLerp::Linear(new_data.p2.reveal() + delta);
-            new_data.p3 = MultiLerp::Linear(new_data.p3.reveal() + delta);
+            new_data.center = MultiLerp::Linear(new_data.center.reveal() + delta);
             self.data.set(new_data);
         }
     }
@@ -494,11 +501,10 @@ impl Squid for Tri {
     }
 
     fn scale(&mut self, total_scale_factor: f32, _options: &InteractionOptions) {
-        let center = self.get_real_center();
         let mut new_data = *self.data.get_real();
-        new_data.p1 = MultiLerp::Linear((self.prescale_size[0] * total_scale_factor) + center);
-        new_data.p2 = MultiLerp::Linear((self.prescale_size[1] * total_scale_factor) + center);
-        new_data.p3 = MultiLerp::Linear((self.prescale_size[2] * total_scale_factor) + center);
+        new_data.p1 = MultiLerp::Linear(self.prescale_size[0] * total_scale_factor);
+        new_data.p2 = MultiLerp::Linear(self.prescale_size[1] * total_scale_factor);
+        new_data.p3 = MultiLerp::Linear(self.prescale_size[2] * total_scale_factor);
         self.data.set(new_data);
     }
 
@@ -507,9 +513,7 @@ impl Squid for Tri {
         let delta = new_position - self.get_real_center();
 
         let mut new_data = *self.data.get_real();
-        new_data.p1 = MultiLerp::Linear(new_data.p1.reveal() + delta);
-        new_data.p2 = MultiLerp::Linear(new_data.p2.reveal() + delta);
-        new_data.p3 = MultiLerp::Linear(new_data.p3.reveal() + delta);
+        new_data.center = MultiLerp::Linear(new_data.center.reveal() + delta);
         self.data.set(new_data);
     }
 
@@ -520,9 +524,7 @@ impl Squid for Tri {
             let delta_position = new_center - center;
             let animated_data = self.data.get_animated();
             let mut new_data = *self.data.get_real();
-            new_data.p1 = MultiLerp::Linear(animated_data.p1.reveal() + delta_position); //, expression.origin);
-            new_data.p2 = MultiLerp::Linear(animated_data.p2.reveal() + delta_position); //, expression.origin);
-            new_data.p3 = MultiLerp::Linear(animated_data.p3.reveal() + delta_position); //, expression.origin);
+            new_data.center = MultiLerp::Circle(animated_data.center.reveal() + delta_position, expression.origin);
             new_data.rotation += expression.delta_object_rotation;
             self.data.set(new_data);
         }
@@ -561,9 +563,7 @@ impl Squid for Tri {
 
     fn duplicate(&self, offset: &glm::Vec2) -> Box<dyn Squid> {
         let mut real = *self.data.get_real();
-        real.p1 = MultiLerp::From(real.p1.reveal() + offset);
-        real.p2 = MultiLerp::From(real.p2.reveal() + offset);
-        real.p3 = MultiLerp::From(real.p3.reveal() + offset);
+        real.center = MultiLerp::From(real.center.reveal() + offset);
         Box::new(Self::from_data(real))
     }
 
@@ -580,8 +580,7 @@ impl Squid for Tri {
             Initiation::Rotate => (),
             Initiation::Scale => {
                 let real = self.data.get_real();
-                let center = self.get_real_center();
-                self.prescale_size = [real.p1.reveal() - center, real.p2.reveal() - center, real.p3.reveal() - center];
+                self.prescale_size = [real.p1.reveal(), real.p2.reveal(), real.p3.reveal()];
             }
             Initiation::Spread { point, center } => {
                 self.spread_behavior = SpreadBehavior {
@@ -608,10 +607,11 @@ impl Squid for Tri {
 
     fn get_opaque_handles(&self) -> Vec<glm::Vec2> {
         let data = self.data.get_animated();
+        let center = data.center.reveal();
         vec![
-            data.p1.reveal(),
-            data.p2.reveal(),
-            data.p3.reveal(),
+            data.p1.reveal() + center,
+            data.p2.reveal() + center,
+            data.p3.reveal() + center,
             self.get_rotate_handle_location(&glm::zero()),
         ]
     }

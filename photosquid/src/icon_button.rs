@@ -43,7 +43,7 @@ impl<T> IconButton<T> {
     pub fn animate(&mut self, focus: bool) {
         if focus != self.focused {
             self.instant = Some(Instant::now());
-            self.focused = focus
+            self.focused = focus;
         }
     }
 

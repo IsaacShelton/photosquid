@@ -1,6 +1,7 @@
 use super::{Capture, Interaction, KeyCapture, Tool};
 use crate::{
     app::{ApplicationState, Operation},
+    bool_poll,
     ocean::{NewSelection, TrySelectResult},
     render_ctx::RenderCtx,
     squid::{self, Initiation},
@@ -53,6 +54,48 @@ impl Pointer {
             }
             TrySelectResult::Preserve => (),
             TrySelectResult::Discard => app.selections.clear(),
+        }
+    }
+
+    fn handle_hotkey(app: &mut ApplicationState, virtual_keycode: VirtualKeyCode) -> Capture {
+        use bool_poll::BoolPoll;
+
+        match virtual_keycode {
+            VirtualKeyCode::G => {
+                if app.perform_next_operation_collectively.poll() {
+                    if let Some(center) = app.get_selection_group_center() {
+                        app.initiate(Initiation::Spread {
+                            point: app.get_mouse_in_world_space(),
+                            center,
+                        });
+                    }
+                } else {
+                    app.initiate(Initiation::Translate);
+                }
+                Capture::Keyboard(KeyCapture::Capture)
+            }
+            VirtualKeyCode::R => {
+                if app.perform_next_operation_collectively.poll() {
+                    if let Some(center) = app.get_selection_group_center() {
+                        app.initiate(Initiation::Revolve {
+                            point: app.get_mouse_in_world_space(),
+                            center,
+                        });
+                    }
+                } else {
+                    app.initiate(Initiation::Rotate);
+                }
+                Capture::Keyboard(KeyCapture::Capture)
+            }
+            VirtualKeyCode::S => {
+                app.initiate(Initiation::Scale);
+                Capture::Keyboard(KeyCapture::Capture)
+            }
+            VirtualKeyCode::C => {
+                app.perform_next_operation_collectively = !app.perform_next_operation_collectively;
+                Capture::Keyboard(KeyCapture::Capture)
+            }
+            _ => Capture::Miss,
         }
     }
 }
@@ -133,47 +176,7 @@ impl Tool for Pointer {
                     return Capture::NoDrag;
                 }
             }
-            Interaction::Key { virtual_keycode } => {
-                return match virtual_keycode {
-                    VirtualKeyCode::G => {
-                        if app.perform_next_operation_collectively {
-                            if let Some(center) = app.get_selection_group_center() {
-                                app.initiate(Initiation::Spread {
-                                    point: app.get_mouse_in_world_space(),
-                                    center,
-                                });
-                            }
-                            app.perform_next_operation_collectively = false;
-                        } else {
-                            app.initiate(Initiation::Translate);
-                        }
-                        Capture::Keyboard(KeyCapture::Capture)
-                    }
-                    VirtualKeyCode::R => {
-                        if app.perform_next_operation_collectively {
-                            if let Some(center) = app.get_selection_group_center() {
-                                app.initiate(Initiation::Revolve {
-                                    point: app.get_mouse_in_world_space(),
-                                    center,
-                                });
-                            }
-                            app.perform_next_operation_collectively = false;
-                        } else {
-                            app.initiate(Initiation::Rotate);
-                        }
-                        Capture::Keyboard(KeyCapture::Capture)
-                    }
-                    VirtualKeyCode::S => {
-                        app.initiate(Initiation::Scale);
-                        Capture::Keyboard(KeyCapture::Capture)
-                    }
-                    VirtualKeyCode::C => {
-                        app.perform_next_operation_collectively = !app.perform_next_operation_collectively;
-                        Capture::Keyboard(KeyCapture::Capture)
-                    }
-                    _ => Capture::Miss,
-                };
-            }
+            Interaction::Key { virtual_keycode } => return Self::handle_hotkey(app, virtual_keycode),
             _ => (),
         }
 
@@ -199,6 +202,6 @@ impl Tool for Pointer {
             text_system,
             font,
             vec![&mut self.translation_snapping_input, &mut self.rotation_snapping_input],
-        )
+        );
     }
 }

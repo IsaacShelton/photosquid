@@ -80,6 +80,6 @@ impl Tool for Rect {
             text_system,
             font,
             vec![&mut self.width_input, &mut self.height_input, &mut self.rotation_input],
-        )
+        );
     }
 }

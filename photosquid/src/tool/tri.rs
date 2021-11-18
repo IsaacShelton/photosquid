@@ -6,7 +6,7 @@ use glium::glutin::event::MouseButton;
 use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;
 use std::rc::Rc;
-  
+
 pub struct Tri {
     rotation_input: UserInput,
 
@@ -58,6 +58,6 @@ impl Tool for Tri {
     }
 
     fn render_options(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>) {
-        tool::render_user_inputs(ctx, text_system, font, vec![&mut self.rotation_input])
+        tool::render_user_inputs(ctx, text_system, font, vec![&mut self.rotation_input]);
     }
 }

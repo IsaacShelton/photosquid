@@ -1,18 +1,11 @@
 use crate::{
-    aabb::AABB,
-    capture::{Capture, KeyCapture},
-    color::Color,
-    icon_button::IconButton,
-    matrix_helpers::reach_inside_mat4,
-    press_animation::PressAnimation,
-    render_ctx::RenderCtx,
-    smooth::Smooth,
-    text_helpers,
+    aabb::AABB, capture::Capture, color::Color, icon_button::IconButton, matrix_helpers::reach_inside_mat4, press_animation::PressAnimation,
+    render_ctx::RenderCtx, smooth::Smooth, text_helpers,
 };
-use glium::glutin::event::{MouseButton, VirtualKeyCode};
+use glium::glutin::event::MouseButton;
 use glium_text_rusttype::{FontTexture, TextDisplay, TextSystem};
 use nalgebra_glm as glm;
-use std::{collections::HashMap, rc::Rc, time::Duration};
+use std::{rc::Rc, time::Duration};
 
 #[allow(dead_code)]
 pub struct Checkbox {
@@ -43,10 +36,6 @@ impl Checkbox {
             return Capture::TakeFocus;
         }
         Capture::Miss
-    }
-
-    pub fn key_press(&mut self, _virtual_keycode: VirtualKeyCode, _mappings: &HashMap<VirtualKeyCode, char>, _shift: bool) -> KeyCapture {
-        KeyCapture::Miss
     }
 
     pub fn render(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>, area: &AABB) {

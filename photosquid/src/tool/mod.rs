@@ -37,7 +37,7 @@ pub trait Tool {
     fn render_options(&mut self, _ctx: &mut RenderCtx, _text_system: &TextSystem, _font: Rc<FontTexture>) {}
 }
 
-pub fn get_nth_input_area(n: i32) -> AABB {
+pub fn get_nth_input_area(n: usize) -> AABB {
     TextInput::standard_area(&glm::vec2(64.0, 128.0 + n as f32 * 96.0))
 }
 
@@ -58,7 +58,7 @@ pub fn interact_user_inputs(user_inputs: Vec<&mut UserInput>, interaction: Inter
             let mut from_i = 0;
 
             for (i, user_input) in user_inputs.iter_mut().enumerate() {
-                let area = get_nth_input_area(i as i32);
+                let area = get_nth_input_area(i);
                 let click_capture = user_input.click(button, &position, &area);
 
                 if click_capture == Capture::TakeFocus {
@@ -82,7 +82,7 @@ pub fn interact_user_inputs(user_inputs: Vec<&mut UserInput>, interaction: Inter
             let shift = app.keys_held.contains(&VirtualKeyCode::LShift);
 
             for user_input in user_inputs.drain(0..) {
-                let key_capture = user_input.key_press(virtual_keycode, &app.numeric_mappings, shift);
+                let key_capture = user_input.key_press(virtual_keycode, shift);
                 if key_capture != KeyCapture::Miss {
                     return Capture::Keyboard(key_capture);
                 }
@@ -97,7 +97,7 @@ pub fn render_user_inputs(ctx: &mut RenderCtx, text_system: &TextSystem, font: R
     let mut user_inputs = user_inputs;
 
     for (i, user_input) in user_inputs.drain(0..).enumerate() {
-        let area = get_nth_input_area(i as i32);
+        let area = get_nth_input_area(i);
         user_input.render(ctx, text_system, font.clone(), &area);
     }
 }

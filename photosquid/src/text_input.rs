@@ -9,7 +9,7 @@ use crate::{
 use glium::glutin::event::{MouseButton, VirtualKeyCode};
 use glium_text_rusttype::{FontTexture, TextDisplay, TextSystem};
 use nalgebra_glm as glm;
-use std::{collections::HashMap, rc::Rc};
+use std::rc::Rc;
 
 pub struct TextInput {
     text: String,
@@ -64,7 +64,7 @@ impl TextInput {
         }
     }
 
-    pub fn key_press(&mut self, virtual_keycode: VirtualKeyCode, mappings: &HashMap<VirtualKeyCode, char>, shift: bool) -> KeyCapture {
+    pub fn key_press(&mut self, virtual_keycode: VirtualKeyCode, shift: bool) -> KeyCapture {
         if !self.focused {
             return KeyCapture::Miss;
         }
@@ -92,7 +92,7 @@ impl TextInput {
             return KeyCapture::Capture;
         }
 
-        if let Some(character) = Self::to_character(virtual_keycode, mappings) {
+        if let Some(character) = Self::numeric_map(virtual_keycode) {
             self.type_character(character);
             self.input_error = false;
             return KeyCapture::Capture;
@@ -233,14 +233,28 @@ impl TextInput {
         }
     }
 
-    fn to_character(virtual_keycode: VirtualKeyCode, mappings: &HashMap<VirtualKeyCode, char>) -> Option<char> {
-        mappings.get(&virtual_keycode).copied()
-    }
-
     fn ensure_not_empty(&mut self) {
         if self.text.is_empty() {
             self.text = self.default_text.clone();
             self.text_display = None;
+        }
+    }
+
+    pub fn numeric_map(virtual_keycode: VirtualKeyCode) -> Option<char> {
+        match virtual_keycode {
+            VirtualKeyCode::Key0 => Some('0'),
+            VirtualKeyCode::Key1 => Some('1'),
+            VirtualKeyCode::Key2 => Some('2'),
+            VirtualKeyCode::Key3 => Some('3'),
+            VirtualKeyCode::Key4 => Some('4'),
+            VirtualKeyCode::Key5 => Some('5'),
+            VirtualKeyCode::Key6 => Some('6'),
+            VirtualKeyCode::Key7 => Some('7'),
+            VirtualKeyCode::Key8 => Some('8'),
+            VirtualKeyCode::Key9 => Some('9'),
+            VirtualKeyCode::Period => Some('.'),
+            VirtualKeyCode::Minus => Some('-'),
+            _ => None,
         }
     }
 }

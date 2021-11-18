@@ -6,6 +6,7 @@ use crate::{
     interaction_options::InteractionOptions,
     mesh::{MeshXyz, MeshXyzUv},
     ocean::{Ocean, Selection},
+    shaders::Shaders,
     smooth::Smooth,
     squid::{Initiation, Squid, SquidRef},
     tool::{Tool, ToolKey},
@@ -17,16 +18,12 @@ use glium::{
         event::{ModifiersState, VirtualKeyCode},
         window::CursorIcon,
     },
-    Display, Program,
+    Display,
 };
 use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;
 use slotmap::SlotMap;
-use std::{
-    collections::{btree_set::BTreeSet, HashMap},
-    rc::Rc,
-    time::Instant,
-};
+use std::{collections::btree_set::BTreeSet, rc::Rc, time::Instant};
 
 pub const MULTISAMPLING_COUNT: u16 = 4;
 
@@ -38,10 +35,7 @@ pub struct ApplicationState {
     pub ring_mesh: MeshXyz,
     pub check_mesh: MeshXyz,
     pub square_xyzuv: MeshXyzUv,
-    pub color_shader_program: Program,
-    pub hue_value_picker_shader_program: Program,
-    pub saturation_picker_shader_program: Program,
-    pub rounded_rectangle_shader_program: Program,
+    pub shaders: Shaders,
     pub mouse_position: Option<LogicalPosition<f32>>,
     pub scale_factor: f64,
     pub ocean: Ocean,
@@ -58,7 +52,6 @@ pub struct ApplicationState {
     pub text_system: TextSystem,
     pub font: Rc<FontTexture>,
     pub context_menu: Option<ContextMenu>,
-    pub numeric_mappings: HashMap<VirtualKeyCode, char>,
     pub interaction_options: InteractionOptions,
     pub wait_for_stop_drag: bool,
     pub operation: Option<Operation>,
@@ -113,8 +106,8 @@ impl ApplicationState {
         Capture::Miss
     }
 
-    pub fn press_key(&mut self, key: &VirtualKeyCode, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>) {
-        if self.modifiers_held.control_or_command() && key == &VirtualKeyCode::Z {
+    pub fn press_key(&mut self, key: VirtualKeyCode, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>) {
+        if self.modifiers_held.control_or_command() && key == VirtualKeyCode::Z {
             if self.modifiers_held.shift() {
                 self.redo();
             } else {
@@ -124,11 +117,11 @@ impl ApplicationState {
         }
 
         if let Some(tool_key) = self.toolbox.get_selected() {
-            if tools[tool_key].interact(Interaction::Key { virtual_keycode: *key }, self) != Capture::Miss {
+            if tools[tool_key].interact(Interaction::Key { virtual_keycode: key }, self) != Capture::Miss {
                 return;
             }
 
-            if tools[tool_key].interact_options(Interaction::Key { virtual_keycode: *key }, self) != Capture::Miss {
+            if tools[tool_key].interact_options(Interaction::Key { virtual_keycode: key }, self) != Capture::Miss {
                 return;
             }
         }
@@ -191,14 +184,14 @@ impl ApplicationState {
             Capture::SpreadSelectedSquids { current } => {
                 for squid_id in self.get_selected_squids() {
                     if let Some(squid) = self.ocean.get_mut(squid_id) {
-                        squid.spread(current, &self.interaction_options)
+                        squid.spread(current, &self.interaction_options);
                     }
                 }
             }
             Capture::RevolveSelectedSquids { current } => {
                 for squid_id in self.get_selected_squids() {
                     if let Some(squid) = self.ocean.get_mut(squid_id) {
-                        squid.revolve(current, &self.interaction_options)
+                        squid.revolve(current, &self.interaction_options);
                     }
                 }
             }
@@ -238,6 +231,7 @@ impl ApplicationState {
         self.wait_for_stop_drag = true;
 
         match initiation {
+            Initiation::Translate { .. } => (),
             Initiation::Rotate => {
                 let mouse = self.mouse_position.unwrap();
                 let camera = self.camera.get_animated();
@@ -264,7 +258,6 @@ impl ApplicationState {
             Initiation::Revolve { point, center } => {
                 self.operation = Some(Operation::Revolve { point, origin: center });
             }
-            _ => (),
         }
 
         for squid_id in self.get_selected_squids() {
@@ -277,7 +270,7 @@ impl ApplicationState {
     pub fn get_closest_selection_center(&self, position: &glm::Vec2) -> Option<glm::Vec2> {
         let mut least_distance = f32::INFINITY;
         let mut closest_center: Option<glm::Vec2> = None;
-        for squid_ref in self.get_selected_squids().iter() {
+        for squid_ref in &self.get_selected_squids() {
             if let Some(squid) = self.ocean.get(*squid_ref) {
                 let center = squid.get_center();
                 let distance = glm::distance(position, &center);
@@ -300,7 +293,7 @@ impl ApplicationState {
 
         let mut average: glm::Vec2 = glm::zero();
 
-        for squid_ref in selected_squids.iter() {
+        for squid_ref in &selected_squids {
             if let Some(squid) = self.ocean.get(*squid_ref) {
                 average += squid.get_center();
             }

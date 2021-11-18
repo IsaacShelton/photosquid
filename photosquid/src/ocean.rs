@@ -73,7 +73,7 @@ impl Ocean {
     }
 
     pub fn remove(&mut self, reference: SquidRef) {
-        for layer in self.layers.iter_mut() {
+        for layer in &mut self.layers {
             layer.remove_mention(reference);
         }
 
@@ -104,7 +104,7 @@ impl Ocean {
                 // If the squid is already selected, and we are trying to select over on-top of one
                 // of its handles, then return to just preserve the existing selection
                 if already_selected {
-                    for region in squid.get_opaque_handles().iter() {
+                    for region in &squid.get_opaque_handles() {
                         if glm::distance(region, &world_mouse) < 2.0 * squid::HANDLE_RADIUS {
                             return TrySelectResult::Preserve;
                         }
@@ -112,13 +112,13 @@ impl Ocean {
                 }
 
                 if let Some(result) = squid.try_select(underneath, camera, self_reference) {
-                    if !already_selected {
+                    return if !already_selected {
                         // Found selection to append-to/replace existing ones
-                        return TrySelectResult::New(result);
+                        TrySelectResult::New(result)
                     } else {
                         // Not new selection found, but preserve existing selection(s)
-                        return TrySelectResult::Preserve;
-                    }
+                        TrySelectResult::Preserve
+                    };
                 }
             }
         }

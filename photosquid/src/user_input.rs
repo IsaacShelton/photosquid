@@ -9,7 +9,7 @@ use enum_as_inner::EnumAsInner;
 use glium::glutin::event::{MouseButton, VirtualKeyCode};
 use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;
-use std::{collections::HashMap, rc::Rc};
+use std::rc::Rc;
 
 #[derive(EnumAsInner)]
 #[allow(clippy::large_enum_variant)]
@@ -28,10 +28,10 @@ impl UserInput {
         }
     }
 
-    pub fn key_press(&mut self, virtual_keycode: VirtualKeyCode, mappings: &HashMap<VirtualKeyCode, char>, shift: bool) -> KeyCapture {
+    pub fn key_press(&mut self, virtual_keycode: VirtualKeyCode, shift: bool) -> KeyCapture {
         match self {
-            Self::TextInput(text_input) => text_input.key_press(virtual_keycode, mappings, shift),
-            Self::Checkbox(checkbox) => checkbox.key_press(virtual_keycode, mappings, shift),
+            Self::TextInput(text_input) => text_input.key_press(virtual_keycode, shift),
+            Self::Checkbox(..) => KeyCapture::Miss,
         }
     }
 

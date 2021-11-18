@@ -44,7 +44,7 @@ impl ToolBox {
             width: 48.0,
             full_width: 256.0,
             selection: SelectionIndicator::new(glm::zero(), false, display),
-            tab_selection: SelectionIndicator::new(glm::vec2(10000000.0, 0.0), true, display),
+            tab_selection: SelectionIndicator::new(glm::vec2(10_000_000.0, 0.0), true, display),
             color_picker: ColorPicker::new(),
             options_tab_region_height: 64.0,
             options_tab_buttons: vec![],
@@ -125,7 +125,7 @@ impl ToolBox {
 
     pub fn select_tool(&mut self, index: usize) {
         if index < self.buttons.len() {
-            for button in self.buttons.iter_mut() {
+            for button in &mut self.buttons {
                 button.animate(false);
             }
 
@@ -136,7 +136,7 @@ impl ToolBox {
 
     pub fn select_tab(&mut self, index: usize) {
         if index < self.options_tab_buttons.len() {
-            for button in self.options_tab_buttons.iter_mut() {
+            for button in &mut self.options_tab_buttons {
                 button.animate(false);
             }
 
@@ -230,7 +230,7 @@ impl ToolBox {
     fn update_tool_buttons(&mut self, window_height: f32) {
         let mut next_y = self.calculate_beginning_y(window_height);
 
-        for button in self.buttons.iter_mut() {
+        for button in &mut self.buttons {
             button.set_raw_position(self.icon_size / 2.0, next_y);
             next_y += self.icon_size + self.padding;
         }
@@ -242,7 +242,7 @@ impl ToolBox {
     fn update_options_tab_buttons(&mut self, window_width: f32) {
         let mut next_x = self.calculate_beginning_x(window_width);
 
-        for button in self.options_tab_buttons.iter_mut() {
+        for button in &mut self.options_tab_buttons {
             button.set_raw_position(next_x, 8.0 + self.icon_size / 2.0);
             next_x += self.icon_size + self.padding;
         }
@@ -300,7 +300,7 @@ impl ToolBox {
         ctx.ribbon_mesh.render(ctx, 0.0, 0.0, self.full_width, ctx.height, &color_scheme.dark_ribbon);
 
         // Icons
-        for button in self.buttons.iter_mut() {
+        for button in &mut self.buttons {
             button.render(ctx, &color_scheme.foreground);
         }
 

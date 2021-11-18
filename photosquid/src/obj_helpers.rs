@@ -18,7 +18,7 @@ pub fn obj_data_to_shape(data: &str) -> Vec<Vertex> {
     for (_i, m) in models.iter().enumerate() {
         let mesh = &m.mesh;
 
-        for index in mesh.indices.iter() {
+        for index in &mesh.indices {
             vertices.push(Vertex {
                 position: [mesh.positions[3 * *index as usize], mesh.positions[3 * *index as usize + 2]],
             });

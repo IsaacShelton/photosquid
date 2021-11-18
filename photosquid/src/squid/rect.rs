@@ -307,7 +307,7 @@ impl Squid for Rect {
             &ctx.color_scheme.foreground,
         );
 
-        for corner in self.get_relative_corners().iter() {
+        for corner in &self.get_relative_corners() {
             ctx.ring_mesh.render(
                 ctx,
                 x + camera.x + corner.x,

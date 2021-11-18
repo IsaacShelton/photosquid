@@ -51,6 +51,6 @@ impl Tool for Circle {
     }
 
     fn render_options(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>) {
-        tool::render_user_inputs(ctx, text_system, font, vec![&mut self.radius_input])
+        tool::render_user_inputs(ctx, text_system, font, vec![&mut self.radius_input]);
     }
 }

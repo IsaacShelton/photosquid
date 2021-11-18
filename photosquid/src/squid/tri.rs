@@ -406,7 +406,7 @@ impl Squid for Tri {
             &ctx.color_scheme.foreground,
         );
 
-        for point in self.get_animated_screen_points(camera).iter() {
+        for point in &self.get_animated_screen_points(camera) {
             ctx.ring_mesh
                 .render(ctx, point.x, point.y, squid::HANDLE_RADIUS, squid::HANDLE_RADIUS, &ctx.color_scheme.foreground);
         }

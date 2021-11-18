@@ -56,7 +56,7 @@ impl Layers {
         // of Ocean::get_mut(), but Rust isn't having it,
         // so we'll have reach into the actual fields of 'ocean' in order for it
         // to be allowed
-        for squid_reference in layer.squids.iter() {
+        for squid_reference in &layer.squids {
             // Use '#[allow(deprecated)]' to silence warning when manually accessing
             // internal fields of 'Ocean' struct
             #[allow(deprecated)]

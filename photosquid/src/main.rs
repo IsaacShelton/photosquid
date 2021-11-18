@@ -1,3 +1,10 @@
+#![warn(
+    clippy::explicit_iter_loop,
+    clippy::semicolon_if_nothing_returned,
+    clippy::wildcard_imports,
+    clippy::too_many_lines,
+    clippy::redundant_else
+)]
 #![feature(try_trait_v2)]
 
 mod aabb;
@@ -5,6 +12,7 @@ mod accumulator;
 mod algorithm;
 mod annotations;
 mod app;
+mod bool_poll;
 mod capture;
 mod checkbox;
 mod color;
@@ -24,6 +32,7 @@ mod options;
 mod press_animation;
 mod render_ctx;
 mod shader_helpers;
+mod shaders;
 mod smooth;
 mod squid;
 mod text_helpers;
@@ -36,14 +45,13 @@ mod vertex;
 
 const TARGET_FPS: u64 = 60;
 
-use app::*;
+use app::{selection_contains, ApplicationState, Dragging, History, MULTISAMPLING_COUNT};
 use capture::Capture;
-use color::Color;
 use color_scheme::ColorScheme;
 use context_menu::ContextAction;
 use glium::{
     glutin::{
-        event::{ElementState, Event::WindowEvent as AbstractWindowEvent, ModifiersState, MouseButton, VirtualKeyCode, WindowEvent as ConcreteWindowEvent},
+        event::{ElementState, Event::WindowEvent as AbstractWindowEvent, ModifiersState, MouseButton, WindowEvent as ConcreteWindowEvent},
         event_loop::{ControlFlow, EventLoop},
         window::WindowBuilder,
         ContextBuilder, GlProfile, GlRequest,
@@ -56,11 +64,12 @@ use mesh::{MeshXyz, MeshXyzUv};
 use nalgebra_glm as glm;
 use ocean::Ocean;
 use render_ctx::RenderCtx;
+use shaders::Shaders;
 use slotmap::SlotMap;
 use smooth::Smooth;
 use squid::{Initiation, SquidRef};
 use std::{
-    collections::{btree_set::BTreeSet, HashMap},
+    collections::btree_set::BTreeSet,
     rc::Rc,
     time::{Duration, Instant},
 };
@@ -85,16 +94,6 @@ fn main() {
         .with_depth_buffer(8);
     let display = Display::new(window_builder, context_builder, &event_loop).unwrap();
 
-    // Build color scheme
-    let color_scheme = ColorScheme {
-        background: Color::from_hex("#2C2F33FF"),
-        light_ribbon: Color::from_hex("#2f3136"),
-        dark_ribbon: Color::from_hex("#23272AFF"),
-        foreground: Color::from_hex("#7289DA"),
-        input: Color::from_hex("#40444B"),
-        error: Color::from_hex("#ed2326"),
-    };
-
     // Build toolbox
     let mut toolbox = ToolBox::new(&display);
     let mut tools: SlotMap<ToolKey, Box<dyn Tool>> = SlotMap::with_key();
@@ -109,47 +108,7 @@ fn main() {
     let check_mesh = MeshXyz::new_ui_check(&display);
     let square_xyzuv = MeshXyzUv::new_square(&display);
 
-    let color_shader_program = shader_helpers::shader_from_source_that_outputs_srgb(
-        &display,
-        include_str!("_src_shaders/color/vertex.glsl"),
-        include_str!("_src_shaders/color/fragment.glsl"),
-        None,
-        true,
-    )
-    .unwrap();
-    let hue_value_picker_shader_program = shader_helpers::shader_from_source_that_outputs_srgb(
-        &display,
-        include_str!("_src_shaders/color_picker/hue_value/vertex.glsl"),
-        include_str!("_src_shaders/color_picker/hue_value/fragment.glsl"),
-        None,
-        true,
-    )
-    .unwrap();
-    let saturation_picker_shader_program = shader_helpers::shader_from_source_that_outputs_srgb(
-        &display,
-        include_str!("_src_shaders/color_picker/saturation/vertex.glsl"),
-        include_str!("_src_shaders/color_picker/saturation/fragment.glsl"),
-        None,
-        true,
-    )
-    .unwrap();
-    let rounded_rectangle_shader_program = shader_helpers::shader_from_source_that_outputs_srgb(
-        &display,
-        include_str!("_src_shaders/rounded_rectangle/vertex.glsl"),
-        include_str!("_src_shaders/rounded_rectangle/fragment.glsl"),
-        None,
-        true,
-    )
-    .unwrap();
-    let television_shader_program = shader_helpers::shader_from_source_that_outputs_srgb(
-        &display,
-        include_str!("_src_shaders/texture/vertex.glsl"),
-        include_str!("_src_shaders/texture/fragment.glsl"),
-        None,
-        false,
-    )
-    .unwrap();
-
+    let shaders = Shaders::new(&display);
     let text_system = glium_text::TextSystem::new(&display);
 
     let font = glium_text::FontTexture::new(
@@ -160,36 +119,17 @@ fn main() {
     )
     .unwrap();
 
-    let numeric_mappings: HashMap<VirtualKeyCode, char> = std::iter::FromIterator::from_iter([
-        (VirtualKeyCode::Key0, '0'),
-        (VirtualKeyCode::Key1, '1'),
-        (VirtualKeyCode::Key2, '2'),
-        (VirtualKeyCode::Key3, '3'),
-        (VirtualKeyCode::Key4, '4'),
-        (VirtualKeyCode::Key5, '5'),
-        (VirtualKeyCode::Key6, '6'),
-        (VirtualKeyCode::Key7, '7'),
-        (VirtualKeyCode::Key8, '8'),
-        (VirtualKeyCode::Key9, '9'),
-        (VirtualKeyCode::Period, '.'),
-        (VirtualKeyCode::Minus, '-'),
-    ]);
-
-    let television = MeshXyzUv::new_square(&display);
     let scale_factor = display.gl_window().window().scale_factor();
 
-    let mut state = ApplicationState {
+    let mut app = ApplicationState {
         display,
-        color_scheme,
+        color_scheme: Default::default(),
         toolbox,
         ribbon_mesh,
         ring_mesh,
         check_mesh,
         square_xyzuv,
-        color_shader_program,
-        hue_value_picker_shader_program,
-        saturation_picker_shader_program,
-        rounded_rectangle_shader_program,
+        shaders,
         mouse_position: None,
         scale_factor,
         ocean: Ocean::new(),
@@ -206,7 +146,6 @@ fn main() {
         text_system,
         font: Rc::new(font),
         context_menu: None,
-        numeric_mappings,
         interaction_options: Default::default(),
         wait_for_stop_drag: false,
         operation: None,
@@ -214,319 +153,356 @@ fn main() {
     };
 
     event_loop.run(move |abstract_event, _, control_flow| {
-        let framebuffer_dimensions = state.display.get_framebuffer_dimensions();
+        let framebuffer_dimensions = app.display.get_framebuffer_dimensions();
 
-        state.frame_start_time = Instant::now();
-        state.dimensions = Some((
-            framebuffer_dimensions.0 as f32 / state.scale_factor as f32,
-            framebuffer_dimensions.1 as f32 / state.scale_factor as f32,
+        app.frame_start_time = Instant::now();
+        app.dimensions = Some((
+            framebuffer_dimensions.0 as f32 / app.scale_factor as f32,
+            framebuffer_dimensions.1 as f32 / app.scale_factor as f32,
         ));
 
-        fn do_click(state: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>, button: MouseButton) -> Capture {
-            // Returns whether a drag is allowed to start
-
-            if state.wait_for_stop_drag {
-                state.wait_for_stop_drag = false;
-                state.dragging = None;
-                state.operation = None;
-                return Capture::NoDrag;
-            }
-
-            let position = state.mouse_position.unwrap();
-            let position = glm::vec2(position.x, position.y);
-            let (width, height) = state.dimensions.unwrap_or_default();
-
-            if let Some(context_menu) = &state.context_menu {
-                let action = context_menu.click(button, &position);
-                state.context_menu = None;
-
-                if let Some(action) = action {
-                    // Handle action
-                    match action {
-                        ContextAction::DeleteSelected => state.delete_selected(),
-                        ContextAction::DuplicateSelected => state.duplicate_selected(),
-                        ContextAction::GrabSelected => {
-                            if state.perform_next_operation_collectively {
-                                if let Some(center) = state.get_selection_group_center() {
-                                    state.initiate(Initiation::Spread {
-                                        point: state.get_mouse_in_world_space(),
-                                        center,
-                                    });
-                                }
-                                state.perform_next_operation_collectively = false;
-                            } else {
-                                state.initiate(Initiation::Translate);
-                            }
-                        }
-                        ContextAction::RotateSelected => {
-                            if state.perform_next_operation_collectively {
-                                if let Some(center) = state.get_selection_group_center() {
-                                    state.initiate(Initiation::Revolve {
-                                        point: state.get_mouse_in_world_space(),
-                                        center,
-                                    });
-                                }
-                                state.perform_next_operation_collectively = false;
-                            } else {
-                                state.initiate(Initiation::Rotate);
-                            }
-                        }
-                        ContextAction::ScaleSelected => state.initiate(Initiation::Scale),
-                        ContextAction::Collectively => state.perform_next_operation_collectively = !state.perform_next_operation_collectively,
-                    }
-                    return Capture::NoDrag;
-                }
-            }
-
-            // Tool options ribbon
-            if let Some(tool_key) = state.toolbox.get_selected() {
-                tools[tool_key].interact_options(Interaction::Click { button, position }, state)?;
-            }
-
-            // Tool ribbon
-            if state.toolbox.click(button, &position, width, height) {
-                return Capture::AllowDrag;
-            }
-
-            if let Some(tool_key) = state.toolbox.get_selected() {
-                return tools[tool_key].interact(Interaction::Click { button, position }, state);
-            }
-
-            Capture::Miss
-        }
-
-        fn do_mouse_release(state: &mut ApplicationState, button: MouseButton) {
-            let position = state.mouse_position.unwrap();
-            let position = glm::vec2(position.x, position.y);
-            let animated_camera = state.camera.get_animated();
-            let unordered_squids: Vec<SquidRef> = state.ocean.get_squids_unordered().collect();
-
-            for reference in unordered_squids {
-                if let Some(squid) = state.ocean.get_mut(reference) {
-                    squid.interact(&Interaction::MouseRelease { position, button }, &animated_camera, &state.interaction_options);
-                }
-            }
-
-            state.toolbox.mouse_release(button);
-
-            // Primitive history
-            state.add_history_marker();
-        }
-
-        fn do_drag(state: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>) -> Capture {
-            let drag = state.dragging.as_ref().unwrap().to_interaction();
-            let (width, _) = state.dimensions.unwrap_or_default();
-
-            state.toolbox.drag(MouseButton::Left, &drag, width)?;
-
-            if let Some(tool_key) = state.toolbox.get_selected() {
-                tools[tool_key].interact(drag, state)?;
-            }
-
-            Capture::Miss
-        }
-
         // Handle user input
-        match abstract_event {
-            AbstractWindowEvent { event, .. } => match event {
-                ConcreteWindowEvent::CloseRequested => {
-                    *control_flow = ControlFlow::Exit;
-                    return;
-                }
-                ConcreteWindowEvent::KeyboardInput { input, .. } => {
-                    if let Some(virtual_keycode) = input.virtual_keycode {
-                        let keys_held = &mut state.keys_held;
-
-                        match input.state {
-                            ElementState::Pressed => {
-                                if keys_held.insert(virtual_keycode) {
-                                    // Press first time
-                                    state.press_key(&virtual_keycode, &mut tools);
-                                } else {
-                                    // Ignore / Repeat key
-                                }
-                            }
-                            ElementState::Released => {
-                                keys_held.remove(&virtual_keycode);
-                            }
-                        }
-                    }
-                }
-                ConcreteWindowEvent::ModifiersChanged(value) => state.modifiers_held = value,
-                ConcreteWindowEvent::MouseInput {
-                    state: element_state, button, ..
-                } => {
-                    if element_state == ElementState::Pressed {
-                        match do_click(&mut state, &mut tools, button) {
-                            Capture::NoDrag => (),
-                            capture => {
-                                state.dragging = Some(Dragging::new(state.mouse_position.unwrap_or_default()));
-                                state.handle_captured(&capture);
-                            }
-                        }
-                    } else {
-                        do_mouse_release(&mut state, button);
-
-                        if !state.wait_for_stop_drag {
-                            state.dragging = None;
-                        }
-                    }
-                }
-                ConcreteWindowEvent::CursorMoved { position, .. } => {
-                    state.mouse_position = Some(position.to_logical(state.scale_factor));
-
-                    if let Some(dragging) = state.dragging.as_mut() {
-                        let logical_position = state.mouse_position.unwrap();
-                        dragging.update(glm::vec2(logical_position.x, logical_position.y));
-
-                        let capture = do_drag(&mut state, &mut tools);
-                        state.handle_captured(&capture);
-                    }
-                }
-                ConcreteWindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                    state.scale_factor = scale_factor;
-                }
-                _ => return,
-            },
-            glium::glutin::event::Event::RedrawRequested(_window_id) => {
-                let (width_u32, height_u32) = state.display.get_framebuffer_dimensions();
-                let (width, height) = state.dimensions.unwrap();
-                let rendered = glium::texture::SrgbTexture2d::empty(&state.display, width_u32, height_u32).unwrap();
-                let mut framebuffer = glium::framebuffer::SimpleFrameBuffer::new(&state.display, &rendered).unwrap();
-
-                state.projection = Some(glm::ortho(0.0, width, height, 0.0, 100.0, -100.0));
-                state.view = Some(glm::translation(&glm::vec2_to_vec3(&state.camera.get_animated())));
-
-                let mut target = state.display.draw();
-
-                // TLDR: Don't use 'target' or 'framebuffer' directly unless you really know
-                // what you're doing. Instead use the methods of 'RenderCtx' to the appropriate target.
-                // NOTE: We won't use 'target' and 'framebuffer' directly most of the time,
-                // since which we render to is dependent on the display's scale factor.
-                // We do this because on macOS, for some reason, to only way to enable MSAA,
-                // is by rendering directly to the buffer. So for retina (and other non-1-factor displays),
-                // we will render to a framebuffer first (since more pixels will be sampled anyways),
-                // but for displays that have a 1-factor ratio, we will render directly and utilize
-                // the built in MSAA for the window render target (this is the only portable way apparently)
-                // Render context is a subset of ApplicationState that only
-                // contains information related to rendering
-                let mut ctx = RenderCtx {
-                    target: &mut target,
-                    framebuffer: &mut framebuffer,
-                    color_shader: &state.color_shader_program,
-                    hue_value_picker_shader: &state.hue_value_picker_shader_program,
-                    saturation_picker_shader: &state.saturation_picker_shader_program,
-                    rounded_rectangle_shader: &state.rounded_rectangle_shader_program,
-                    projection: &state.projection.unwrap(),
-                    view: &state.view.unwrap(),
-                    width,
-                    height,
-                    scale_factor: state.scale_factor,
-                    ribbon_mesh: &state.ribbon_mesh,
-                    ring_mesh: &state.ring_mesh,
-                    check_mesh: &state.check_mesh,
-                    square_xyzuv: &state.square_xyzuv,
-                    color_scheme: &state.color_scheme,
-                    camera: &state.camera.get_animated(),
-                    display: &state.display,
-                };
-
-                // Render components
-                {
-                    ctx.clear_color(&state.color_scheme.background);
-
-                    let lowest_squids: Vec<SquidRef> = state.ocean.get_squids_lowest().collect();
-
-                    for reference in lowest_squids.iter() {
-                        if let Some(squid) = state.ocean.get_mut(*reference) {
-                            squid.render(&mut ctx, None);
-
-                            if selection_contains(&state.selections, *reference) {
-                                squid.render_selected_indication(&mut ctx);
-                            }
-                        }
-                    }
-
-                    state.toolbox.render(
-                        &mut ctx,
-                        &mut tools,
-                        &mut options_tabs,
-                        &state.color_scheme,
-                        &state.text_system,
-                        state.font.clone(),
-                        &mut state.ocean,
-                        &state.selections,
-                    );
-
-                    if let Some(context_menu) = &mut state.context_menu {
-                        context_menu.render(&mut ctx, &state.text_system, state.font.clone());
-                    }
-                }
-
-                // If we're not doing MSAA, render the framebuffer instead of having just rendered directly.
-                // Draw render to window
-                if state.scale_factor != 1.0 {
-                    use glium::Surface;
-                    use matrix_helpers::reach_inside_mat4;
-
-                    let identity = glm::identity::<f32, 4>();
-
-                    let uniforms = glium::uniform! {
-                        transformation: reach_inside_mat4(&identity),
-                        view: reach_inside_mat4(&identity),
-                        projection: reach_inside_mat4(&identity),
-                        texture_sampler: &rendered
-                    };
-
-                    ctx.target
-                        .draw(
-                            &television.vertex_buffer,
-                            &television.indices,
-                            &television_shader_program,
-                            &uniforms,
-                            &Default::default(),
-                        )
-                        .unwrap();
-                }
-
-                // Finalize frame
-                target.finish().unwrap();
-            }
-            _ => (),
+        if let Some(new_control_flow) = on_event(abstract_event, &mut app, &mut tools, &mut options_tabs) {
+            *control_flow = new_control_flow;
+            return;
         }
-
-        let (width, height) = state.dimensions.unwrap();
 
         // Update components
-        {
-            state.toolbox.update(width, height);
-
-            if let Some(new_color) = state.toolbox.color_picker.poll() {
-                for selection in state.selections.iter() {
-                    if selection.limb_id.is_none() {
-                        if let Some(squid) = state.ocean.get_mut(selection.squid_id) {
-                            squid.set_color(new_color);
-                        }
-                    }
-                }
-            }
-        }
+        update_components(&mut app);
 
         // Handle control flow
-        match *control_flow {
-            ControlFlow::Exit => (),
-            _ => {
-                let elapsed_time = Instant::now().duration_since(state.frame_start_time).as_millis() as u64;
+        if !matches!(*control_flow, ControlFlow::Exit) {
+            let elapsed_time = Instant::now().duration_since(app.frame_start_time).as_millis() as u64;
+            app.display.gl_window().window().request_redraw();
 
-                state.display.gl_window().window().request_redraw();
+            let wait_millis = match 100 / TARGET_FPS >= elapsed_time {
+                true => 1000 / TARGET_FPS - elapsed_time,
+                false => 0,
+            };
 
-                let wait_millis = match 100 / TARGET_FPS >= elapsed_time {
-                    true => 1000 / TARGET_FPS - elapsed_time,
-                    false => 0,
-                };
-                let next_frame_time = state.frame_start_time + Duration::from_millis(wait_millis);
-                *control_flow = ControlFlow::WaitUntil(next_frame_time);
-            }
+            let next_frame_time = app.frame_start_time + Duration::from_millis(wait_millis);
+            *control_flow = ControlFlow::WaitUntil(next_frame_time);
         }
     });
+}
+
+fn on_event(
+    abstract_event: glium::glutin::event::Event<()>,
+    app: &mut ApplicationState,
+    tools: &mut SlotMap<ToolKey, Box<dyn Tool>>,
+    options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>,
+) -> Option<ControlFlow> {
+    match abstract_event {
+        AbstractWindowEvent { event, .. } => match event {
+            ConcreteWindowEvent::CloseRequested => return Some(ControlFlow::Exit),
+            ConcreteWindowEvent::KeyboardInput { input, .. } => on_keyboard_input(app, tools, input),
+            ConcreteWindowEvent::ModifiersChanged(value) => app.modifiers_held = value,
+            ConcreteWindowEvent::MouseInput { state, button, .. } => on_mouse_input(app, tools, state, button),
+            ConcreteWindowEvent::CursorMoved { position, .. } => on_mouse_move(app, tools, position),
+            ConcreteWindowEvent::ScaleFactorChanged { scale_factor, .. } => app.scale_factor = scale_factor,
+            _ => (),
+        },
+        glium::glutin::event::Event::RedrawRequested(..) => redraw(app, tools, options_tabs),
+        _ => (),
+    }
+    None
+}
+
+fn update_components(app: &mut ApplicationState) {
+    let (width, height) = app.dimensions.unwrap();
+
+    app.toolbox.update(width, height);
+
+    if let Some(new_color) = app.toolbox.color_picker.poll() {
+        for selection in app.selections.iter().filter(|x| x.limb_id.is_none()) {
+            if let Some(squid) = app.ocean.get_mut(selection.squid_id) {
+                squid.set_color(new_color);
+            }
+        }
+    }
+}
+
+fn redraw(
+    app: &mut ApplicationState,
+    tools: &mut SlotMap<ToolKey, Box<dyn Tool>>,
+    options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>,
+) {
+    // Get dimensions of window
+    let (width, height) = app.dimensions.unwrap();
+    let (width_u32, height_u32) = app.display.get_framebuffer_dimensions();
+
+    // Create texture to hold render output (if we aren't going to render directly)
+    let rendered = glium::texture::SrgbTexture2d::empty(&app.display, width_u32, height_u32).unwrap();
+
+    // Create framebuffer (in case we aren't going to render directly)
+    let mut framebuffer = glium::framebuffer::SimpleFrameBuffer::new(&app.display, &rendered).unwrap();
+
+    // Setup matrices
+    app.projection = Some(glm::ortho(0.0, width, height, 0.0, 100.0, -100.0));
+    app.view = Some(glm::translation(&glm::vec2_to_vec3(&app.camera.get_animated())));
+
+    // Create target
+    let mut target = app.display.draw();
+
+    // Render main application
+    render_app(app, tools, options_tabs, &mut target, &mut framebuffer);
+
+    // If we rendered indirectly, then render the final output to screen now
+    if app.scale_factor != 1.0 {
+        render_television(&mut target, &rendered, &app.square_xyzuv, &app.shaders.television_shader);
+    }
+
+    // Finalize render
+    target.finish().unwrap();
+}
+
+fn render_app<'f>(
+    app: &mut ApplicationState,
+    tools: &mut SlotMap<ToolKey, Box<dyn Tool>>,
+    options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>,
+    target: &'f mut glium::Frame,
+    framebuffer: &'f mut glium::framebuffer::SimpleFrameBuffer<'f>,
+) {
+    let (width, height) = app.dimensions.unwrap();
+
+    // TLDR: Don't use 'target' or 'framebuffer' directly unless you really know
+    // what you're doing. Instead use methods of 'RenderCtx' that will automatically
+    // use the appropriate target.
+
+    // NOTE: We won't use 'target' and 'framebuffer' directly most of the time,
+    // since which we render to is dependent on the display's scale factor.
+    // We do this because on macOS, for some reason, to only way to enable MSAA,
+    // is by rendering directly to the buffer. So for retina (and other non-1-factor displays),
+    // we will render to a framebuffer first (since more pixels will be sampled anyways),
+    // but for displays that have a 1-factor ratio, we will render directly and utilize
+    // the built in MSAA for the window render target (this is the only portable way apparently)
+    // Render context is a subset of ApplicationState that only
+    // contains information related to rendering
+
+    let mut ctx: RenderCtx<'_, 'f> = RenderCtx {
+        target,
+        framebuffer,
+        color_shader: &app.shaders.color_shader,
+        hue_value_picker_shader: &app.shaders.hue_value_picker_shader,
+        saturation_picker_shader: &app.shaders.saturation_picker_shader,
+        rounded_rectangle_shader: &app.shaders.rounded_rectangle_shader,
+        projection: &app.projection.unwrap(),
+        view: &app.view.unwrap(),
+        width,
+        height,
+        scale_factor: app.scale_factor,
+        ribbon_mesh: &app.ribbon_mesh,
+        ring_mesh: &app.ring_mesh,
+        check_mesh: &app.check_mesh,
+        square_xyzuv: &app.square_xyzuv,
+        color_scheme: &app.color_scheme,
+        camera: &app.camera.get_animated(),
+        display: &app.display,
+    };
+
+    ctx.clear_color(&app.color_scheme.background);
+
+    for reference in &app.ocean.get_squids_lowest().collect::<Vec<_>>() {
+        if let Some(squid) = app.ocean.get_mut(*reference) {
+            squid.render(&mut ctx, None);
+
+            if selection_contains(&app.selections, *reference) {
+                squid.render_selected_indication(&mut ctx);
+            }
+        }
+    }
+
+    app.toolbox.render(
+        &mut ctx,
+        tools,
+        options_tabs,
+        &app.color_scheme,
+        &app.text_system,
+        app.font.clone(),
+        &mut app.ocean,
+        &app.selections,
+    );
+
+    if let Some(context_menu) = &mut app.context_menu {
+        context_menu.render(&mut ctx, &app.text_system, app.font.clone());
+    }
+}
+
+fn render_television(target: &mut glium::Frame, rendered: &glium::texture::SrgbTexture2d, television: &MeshXyzUv, television_shader_program: &glium::Program) {
+    // If we're not doing MSAA, render a framebuffer instead of having just rendered directly.
+    // Draw render to window
+
+    use glium::Surface;
+    use matrix_helpers::reach_inside_mat4;
+
+    let identity = glm::identity::<f32, 4>();
+
+    let uniforms = glium::uniform! {
+        transformation: reach_inside_mat4(&identity),
+        view: reach_inside_mat4(&identity),
+        projection: reach_inside_mat4(&identity),
+        texture_sampler: rendered
+    };
+
+    target
+        .draw(
+            &television.vertex_buffer,
+            &television.indices,
+            &television_shader_program,
+            &uniforms,
+            &Default::default(),
+        )
+        .unwrap();
+}
+
+fn do_click(state: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>, button: MouseButton) -> Capture {
+    // Returns whether a drag is allowed to start
+
+    if state.wait_for_stop_drag {
+        state.wait_for_stop_drag = false;
+        state.dragging = None;
+        state.operation = None;
+        return Capture::NoDrag;
+    }
+
+    let position = state.mouse_position.unwrap();
+    let position = glm::vec2(position.x, position.y);
+    let (width, height) = state.dimensions.unwrap_or_default();
+
+    if let Some(context_menu) = &state.context_menu {
+        let action = context_menu.click(button, &position);
+        state.context_menu = None;
+
+        if let Some(action) = action {
+            // Handle action
+            match action {
+                ContextAction::DeleteSelected => state.delete_selected(),
+                ContextAction::DuplicateSelected => state.duplicate_selected(),
+                ContextAction::GrabSelected => {
+                    if state.perform_next_operation_collectively {
+                        if let Some(center) = state.get_selection_group_center() {
+                            state.initiate(Initiation::Spread {
+                                point: state.get_mouse_in_world_space(),
+                                center,
+                            });
+                        }
+                        state.perform_next_operation_collectively = false;
+                    } else {
+                        state.initiate(Initiation::Translate);
+                    }
+                }
+                ContextAction::RotateSelected => {
+                    if state.perform_next_operation_collectively {
+                        if let Some(center) = state.get_selection_group_center() {
+                            state.initiate(Initiation::Revolve {
+                                point: state.get_mouse_in_world_space(),
+                                center,
+                            });
+                        }
+                        state.perform_next_operation_collectively = false;
+                    } else {
+                        state.initiate(Initiation::Rotate);
+                    }
+                }
+                ContextAction::ScaleSelected => state.initiate(Initiation::Scale),
+                ContextAction::Collectively => state.perform_next_operation_collectively = !state.perform_next_operation_collectively,
+            }
+            return Capture::NoDrag;
+        }
+    }
+
+    // Tool options ribbon
+    if let Some(tool_key) = state.toolbox.get_selected() {
+        tools[tool_key].interact_options(Interaction::Click { button, position }, state)?;
+    }
+
+    // Tool ribbon
+    if state.toolbox.click(button, &position, width, height) {
+        return Capture::AllowDrag;
+    }
+
+    if let Some(tool_key) = state.toolbox.get_selected() {
+        return tools[tool_key].interact(Interaction::Click { button, position }, state);
+    }
+
+    Capture::Miss
+}
+
+fn do_mouse_release(app: &mut ApplicationState, button: MouseButton) {
+    let position = app.mouse_position.unwrap();
+    let position = glm::vec2(position.x, position.y);
+    let animated_camera = app.camera.get_animated();
+    let unordered_squids: Vec<SquidRef> = app.ocean.get_squids_unordered().collect();
+
+    for reference in unordered_squids {
+        if let Some(squid) = app.ocean.get_mut(reference) {
+            squid.interact(&Interaction::MouseRelease { position, button }, &animated_camera, &app.interaction_options);
+        }
+    }
+
+    app.toolbox.mouse_release(button);
+
+    // Primitive history
+    app.add_history_marker();
+}
+
+fn do_drag(app: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>) -> Capture {
+    let drag = app.dragging.as_ref().unwrap().to_interaction();
+    let (width, _) = app.dimensions.unwrap_or_default();
+
+    app.toolbox.drag(MouseButton::Left, &drag, width)?;
+
+    if let Some(tool_key) = app.toolbox.get_selected() {
+        tools[tool_key].interact(drag, app)?;
+    }
+
+    Capture::Miss
+}
+
+pub fn on_keyboard_input(app: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>, input: glium::glutin::event::KeyboardInput) {
+    if let Some(virtual_keycode) = input.virtual_keycode {
+        let keys_held = &mut app.keys_held;
+
+        match input.state {
+            ElementState::Pressed => {
+                if keys_held.insert(virtual_keycode) {
+                    // Press first time
+                    app.press_key(virtual_keycode, tools);
+                }
+            }
+            ElementState::Released => {
+                keys_held.remove(&virtual_keycode);
+            }
+        }
+    }
+}
+
+fn on_mouse_input(app: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>, state: ElementState, button: MouseButton) {
+    if state == ElementState::Pressed {
+        match do_click(app, tools, button) {
+            Capture::NoDrag => (),
+            capture => {
+                app.dragging = Some(Dragging::new(app.mouse_position.unwrap_or_default()));
+                app.handle_captured(&capture);
+            }
+        }
+    } else {
+        do_mouse_release(app, button);
+
+        if !app.wait_for_stop_drag {
+            app.dragging = None;
+        }
+    }
+}
+
+fn on_mouse_move(app: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>, position: glium::glutin::dpi::PhysicalPosition<f64>) {
+    app.mouse_position = Some(position.to_logical(app.scale_factor));
+
+    if let Some(dragging) = app.dragging.as_mut() {
+        let logical_position = app.mouse_position.unwrap();
+        dragging.update(glm::vec2(logical_position.x, logical_position.y));
+
+        let capture = do_drag(app, tools);
+        app.handle_captured(&capture);
+    }
 }

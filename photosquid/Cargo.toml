@@ -17,6 +17,7 @@ palette = "0.6.0"
 glium_text_rusttype = { path = "../glium_text_rusttype" }
 rand = "0.7"
 enum-as-inner = "0.3.3"
-almost = "0.2.0"
+angular-units = "0.2.4"
 # serde = { version = "1.0", features = ["derive"] }
 # bincode = "1.2.1"
+# approx = "0.5.0"

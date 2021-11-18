@@ -1,3 +1,4 @@
+use angular_units::{Angle, Rad};
 use nalgebra_glm as glm;
 
 #[derive(Copy, Clone, Default)]
@@ -52,7 +53,6 @@ impl Accumulatable for f32 {
         *self += *other;
 
         let result = if threshold > 0.0 {
-            //sign * (((signless + 0.5 * threshold) / threshold).floor()) * threshold
             (((*self + 0.5 * threshold) / threshold).floor()) * threshold
         } else {
             *other
@@ -91,6 +91,41 @@ impl Accumulatable for glm::Vec2 {
         } else {
             *self -= result;
             Some(result)
+        }
+    }
+}
+
+impl Accumulatable for Rad<f32> {
+    type Threshold = Rad<f32>;
+
+    fn zero() -> Self {
+        Rad(0.0)
+    }
+
+    fn accumulate(&mut self, other: &Self, threshold: Self::Threshold) -> Option<Self> {
+        // threshold of PI
+        // PI => PI
+        // -PI => -PI
+        // PI/2 => PI
+        // -PI/2 => -PI
+        // -PI/3 => 0
+        // PI/3 => 0
+
+        // f(-x) = -f(x)
+
+        *self += *other;
+
+        let result = if threshold.scalar() > 0.0 {
+            (((self.scalar() + 0.5 * threshold.scalar()) / threshold.scalar()).floor()) * threshold.scalar()
+        } else {
+            other.scalar()
+        };
+
+        if result == 0.0 {
+            None
+        } else {
+            *self -= Rad(result);
+            Some(Rad(result))
         }
     }
 }

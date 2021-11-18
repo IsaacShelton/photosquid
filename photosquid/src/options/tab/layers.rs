@@ -1,11 +1,12 @@
 use super::Tab;
 use crate::{
-    app::{selection_contains, ApplicationState},
+    app::ApplicationState,
     capture::Capture,
     color::Color,
     interaction::Interaction,
-    ocean::{Ocean, Selection},
+    ocean::Ocean,
     render_ctx::RenderCtx,
+    selection::{selection_contains, Selection},
     squid::PreviewParams,
     text_helpers,
 };

@@ -1,3 +1,4 @@
+use angular_units::Rad;
 use nalgebra_glm as glm;
 use std::ops::{ControlFlow, FromResidual, Try};
 
@@ -9,7 +10,7 @@ pub enum Capture {
     TakeFocus,
     Keyboard(KeyCapture),
     MoveSelectedSquids { delta: glm::Vec2 },
-    RotateSelectedSquids { delta_theta: f32 },
+    RotateSelectedSquids { delta_theta: Rad<f32> },
     ScaleSelectedSquids { total_scale_factor: f32 },
     SpreadSelectedSquids { current: glm::Vec2 },
     RevolveSelectedSquids { current: glm::Vec2 },

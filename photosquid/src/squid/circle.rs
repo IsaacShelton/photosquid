@@ -10,15 +10,16 @@ use crate::{
     math_helpers::angle_difference,
     matrix_helpers::reach_inside_mat4,
     mesh::MeshXyz,
-    ocean::{NewSelection, NewSelectionInfo, Selection},
     render_ctx::RenderCtx,
-    smooth::{Lerpable, NoLerp, Smooth},
+    selection::{NewSelection, NewSelectionInfo, Selection},
+    smooth::{Lerpable, MultiLerp, NoLerp, Smooth},
     squid::{
         self,
         behavior::{RevolveBehavior, SpreadBehavior, TranslateBehavior},
         PreviewParams,
     },
 };
+use angular_units::{self, Angle, Rad};
 use glium::glutin::event::MouseButton;
 use nalgebra_glm as glm;
 use std::time::{Duration, Instant};
@@ -35,7 +36,7 @@ pub struct Circle {
     translate_behavior: TranslateBehavior,
 
     // Virtual Rotate
-    rotation_accumulator: Accumulator<f32>,
+    rotation_accumulator: Accumulator<Rad<f32>>,
 
     // Scale
     prescale_size: f32,
@@ -52,11 +53,10 @@ pub struct Circle {
 
 #[derive(Copy, Clone)]
 pub struct CircleData {
-    x: f32,
-    y: f32,
+    position: MultiLerp<glm::Vec2>,
     radius: f32,
     color: NoLerp<Color>,
-    virtual_rotation: f32,
+    virtual_rotation: Rad<f32>,
 }
 
 impl Lerpable for CircleData {
@@ -64,11 +64,10 @@ impl Lerpable for CircleData {
 
     fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
         Self {
-            x: interpolation::Lerp::lerp(&self.x, &other.x, scalar),
-            y: interpolation::Lerp::lerp(&self.y, &other.y, scalar),
+            position: Lerpable::lerp(&self.position, &other.position, scalar),
             radius: interpolation::Lerp::lerp(&self.radius, &other.radius, scalar),
             color: Lerpable::lerp(&self.color, &other.color, scalar),
-            virtual_rotation: interpolation::Lerp::lerp(&self.virtual_rotation, &other.virtual_rotation, scalar),
+            virtual_rotation: angular_units::Interpolate::interpolate(&self.virtual_rotation, &other.virtual_rotation, *scalar),
         }
     }
 }
@@ -76,11 +75,10 @@ impl Lerpable for CircleData {
 impl Circle {
     pub fn new(x: f32, y: f32, radius: f32, color: Color) -> Self {
         let data = CircleData {
-            x,
-            y,
+            position: MultiLerp::From(glm::vec2(x, y)),
             radius,
             color: NoLerp(color),
-            virtual_rotation: 0.0,
+            virtual_rotation: Rad(0.0),
         };
         Self::from_data(data)
     }
@@ -102,22 +100,21 @@ impl Circle {
 
     pub fn get_rotate_handle_location(&self, camera: &glm::Vec2) -> glm::Vec2 {
         let CircleData {
-            x,
-            y,
+            position,
             radius,
             virtual_rotation,
             ..
         } = self.data.get_animated();
-        glm::vec2(x + camera.x + virtual_rotation.cos() * radius, y + camera.y - virtual_rotation.sin() * radius)
+
+        position.reveal() + camera + radius * glm::vec2(virtual_rotation.cos(), -virtual_rotation.sin())
     }
 
-    fn get_delta_rotation(&self, mouse_position: &glm::Vec2, camera: &glm::Vec2) -> f32 {
+    fn get_delta_rotation(&self, mouse_position: &glm::Vec2, camera: &glm::Vec2) -> Rad<f32> {
         let real = self.data.get_real();
-        let screen_x = real.x + camera.x;
-        let screen_y = real.y + camera.y;
+        let screen_position = real.position.reveal() + camera;
 
-        let old_rotation = real.virtual_rotation + self.rotation_accumulator.residue();
-        let new_rotation = -1.0 * (mouse_position.y - screen_y).atan2(mouse_position.x - screen_x);
+        let old_rotation = real.virtual_rotation + *self.rotation_accumulator.residue();
+        let new_rotation = Rad(-1.0 * (mouse_position.y - screen_position.y).atan2(mouse_position.x - screen_position.x));
 
         angle_difference(old_rotation, new_rotation)
     }
@@ -128,14 +125,14 @@ impl Circle {
 
         let mut new_data = *real_in_world;
         new_data.virtual_rotation += self.get_delta_rotation(mouse, camera);
-        new_data.radius = glm::distance(&glm::vec2(real_in_world.x, real_in_world.y), &target_in_world);
+        new_data.radius = glm::distance(&real_in_world.position.reveal(), &target_in_world);
         self.data.set(new_data);
     }
 }
 
 impl Squid for Circle {
     fn render(&mut self, ctx: &mut RenderCtx, as_preview: Option<PreviewParams>) {
-        let CircleData { x, y, radius, color, .. } = self.data.get_animated();
+        let CircleData { position, radius, color, .. } = self.data.get_animated();
 
         if self.mesh.is_none() {
             self.mesh = Some(MeshXyz::new_shape_circle(ctx.display));
@@ -145,7 +142,7 @@ impl Squid for Circle {
             let matrix = glm::translation(&glm::vec2_to_vec3(&preview.position));
             glm::scale(&matrix, &glm::vec3(preview.size * 0.5, preview.size * 0.5, 0.0))
         } else {
-            let matrix = glm::translation(&glm::vec3(x, y, 0.0));
+            let matrix = glm::translation(&glm::vec2_to_vec3(&position.reveal()));
             glm::scale(&matrix, &glm::vec3(radius, radius, 0.0))
         };
 
@@ -169,12 +166,12 @@ impl Squid for Circle {
 
     fn render_selected_indication(&self, ctx: &mut RenderCtx) {
         let camera = ctx.camera;
-        let CircleData { x, y, .. } = self.data.get_animated();
+        let CircleData { position, .. } = self.data.get_animated();
 
         ctx.ring_mesh.render(
             ctx,
-            x + camera.x,
-            y + camera.y,
+            position.reveal().x + camera.x,
+            position.reveal().y + camera.y,
             squid::HANDLE_RADIUS,
             squid::HANDLE_RADIUS,
             &ctx.color_scheme.foreground,
@@ -237,13 +234,12 @@ impl Squid for Circle {
 
         if delta != glm::zero::<glm::Vec2>() {
             let mut new_data = *self.data.get_real();
-            new_data.x += delta.x;
-            new_data.y += delta.y;
+            new_data.position = MultiLerp::Linear(new_data.position.reveal() + delta);
             self.data.set(new_data);
         }
     }
 
-    fn rotate(&mut self, raw_delta_theta: f32, options: &InteractionOptions) {
+    fn rotate(&mut self, raw_delta_theta: Rad<f32>, options: &InteractionOptions) {
         if let Some(delta_theta) = self.rotation_accumulator.accumulate(&raw_delta_theta, options.rotation_snapping) {
             let mut new_data = *self.data.get_real();
             new_data.virtual_rotation += delta_theta;
@@ -258,11 +254,8 @@ impl Squid for Circle {
     }
 
     fn spread(&mut self, current: &glm::Vec2, _options: &InteractionOptions) {
-        let new_position = self.spread_behavior.express(current);
-
         let mut new_data = *self.data.get_real();
-        new_data.x = new_position.x;
-        new_data.y = new_position.y;
+        new_data.position = MultiLerp::Linear(self.spread_behavior.express(current));
         self.data.set(new_data);
     }
 
@@ -271,8 +264,7 @@ impl Squid for Circle {
             let mut new_data = *self.data.get_real();
 
             let new_center = expression.apply_origin_rotation_to_center();
-            new_data.x = new_center.x;
-            new_data.y = new_center.y;
+            new_data.position = MultiLerp::Circle(new_center, expression.origin);
             new_data.virtual_rotation += expression.delta_object_rotation;
             self.data.set(new_data);
         }
@@ -280,7 +272,7 @@ impl Squid for Circle {
 
     fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool {
         let real = self.data.get_real();
-        let position = glm::vec2(real.x, real.y) + camera;
+        let position = real.position.reveal() + camera;
         glm::distance(&position, underneath) < real.radius
     }
 
@@ -317,8 +309,7 @@ impl Squid for Circle {
 
     fn duplicate(&self, offset: &glm::Vec2) -> Box<dyn Squid> {
         let mut real = *self.data.get_real();
-        real.x += offset.x;
-        real.y += offset.y;
+        real.position = MultiLerp::From(real.position.reveal() + offset);
         Box::new(Self::from_data(real))
     }
 
@@ -343,8 +334,8 @@ impl Squid for Circle {
     }
 
     fn get_center(&self) -> glm::Vec2 {
-        let CircleData { x, y, .. } = self.data.get_animated();
-        glm::vec2(x, y)
+        let CircleData { position, .. } = self.data.get_animated();
+        position.reveal()
     }
 
     fn get_name(&self) -> &str {

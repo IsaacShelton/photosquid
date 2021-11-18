@@ -19,6 +19,8 @@ mod color;
 mod color_impls;
 mod color_scheme;
 mod context_menu;
+mod dragging;
+mod history;
 mod icon_button;
 mod interaction;
 mod interaction_options;
@@ -31,6 +33,7 @@ mod ocean;
 mod options;
 mod press_animation;
 mod render_ctx;
+mod selection;
 mod shader_helpers;
 mod shaders;
 mod smooth;
@@ -45,10 +48,11 @@ mod vertex;
 
 const TARGET_FPS: u64 = 60;
 
-use app::{selection_contains, ApplicationState, Dragging, History, MULTISAMPLING_COUNT};
+use app::{ApplicationState, MULTISAMPLING_COUNT};
 use capture::Capture;
 use color_scheme::ColorScheme;
 use context_menu::ContextAction;
+use dragging::Dragging;
 use glium::{
     glutin::{
         event::{ElementState, Event::WindowEvent as AbstractWindowEvent, ModifiersState, MouseButton, WindowEvent as ConcreteWindowEvent},
@@ -62,8 +66,8 @@ use glium_text_rusttype as glium_text;
 use interaction::Interaction;
 use mesh::{MeshXyz, MeshXyzUv};
 use nalgebra_glm as glm;
-use ocean::Ocean;
 use render_ctx::RenderCtx;
+use selection::selection_contains;
 use shaders::Shaders;
 use slotmap::SlotMap;
 use smooth::Smooth;
@@ -132,8 +136,8 @@ fn main() {
         shaders,
         mouse_position: None,
         scale_factor,
-        ocean: Ocean::new(),
-        history: History::new(),
+        ocean: Default::default(),
+        history: Default::default(),
         dimensions: None,
         projection: None,
         view: None,
@@ -348,7 +352,7 @@ fn render_television(target: &mut glium::Frame, rendered: &glium::texture::SrgbT
         .draw(
             &television.vertex_buffer,
             &television.indices,
-            &television_shader_program,
+            television_shader_program,
             &uniforms,
             &Default::default(),
         )
@@ -358,8 +362,9 @@ fn render_television(target: &mut glium::Frame, rendered: &glium::texture::SrgbT
 fn do_click(state: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>, button: MouseButton) -> Capture {
     // Returns whether a drag is allowed to start
 
-    if state.wait_for_stop_drag {
-        state.wait_for_stop_drag = false;
+    use bool_poll::BoolPoll;
+
+    if state.wait_for_stop_drag.poll() {
         state.dragging = None;
         state.operation = None;
         return Capture::NoDrag;

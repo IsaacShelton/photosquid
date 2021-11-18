@@ -1,3 +1,4 @@
+use angular_units::Rad;
 use interpolation::Ease;
 
 #[derive(Copy, Clone)]
@@ -24,12 +25,12 @@ impl PressAnimation {
                 if focus {
                     AnimationMoment {
                         relative_scale: if t < 0.5 { (2.0 * t).exponential_out() } else { 1.0 },
-                        rotation: 0.25
+                        rotation: Rad(0.25
                             * if t < 0.5 {
                                 (std::f32::consts::FRAC_PI_2 * -2.0 * (1.0 - t * 2.0)).sin()
                             } else {
                                 0.0
-                            },
+                            }),
                         ..Default::default()
                     }
                 } else {
@@ -39,7 +40,7 @@ impl PressAnimation {
             Self::Cycle => {
                 if focus {
                     AnimationMoment {
-                        rotation: if t < 0.5 { (2.0 * t).exponential_out() * std::f32::consts::TAU } else { 0.0 },
+                        rotation: Rad(if t < 0.5 { (2.0 * t).exponential_out() * std::f32::consts::TAU } else { 0.0 }),
                         ..Default::default()
                     }
                 } else {
@@ -49,11 +50,11 @@ impl PressAnimation {
             Self::HalfCycle => {
                 if focus {
                     AnimationMoment {
-                        rotation: if t < 0.5 {
+                        rotation: Rad(if t < 0.5 {
                             (2.0 * t).exponential_out() * std::f32::consts::PI + std::f32::consts::PI
                         } else {
                             0.0
-                        },
+                        }),
                         ..Default::default()
                     }
                 } else {
@@ -61,7 +62,7 @@ impl PressAnimation {
                 }
             }
             Self::Fall => AnimationMoment {
-                backwards_rotation: if focus { t.bounce_out() } else { 1.0 - t.exponential_out() },
+                backwards_rotation: Rad(if focus { t.bounce_out() } else { 1.0 - t.exponential_out() }),
                 ..Default::default()
             },
         }
@@ -69,16 +70,16 @@ impl PressAnimation {
 }
 
 pub struct AnimationMoment {
-    pub backwards_rotation: f32,
-    pub rotation: f32,
+    pub backwards_rotation: Rad<f32>,
+    pub rotation: Rad<f32>,
     pub relative_scale: f32,
 }
 
 impl Default for AnimationMoment {
     fn default() -> Self {
         Self {
-            backwards_rotation: 0.0,
-            rotation: 0.0,
+            backwards_rotation: Rad(0.0),
+            rotation: Rad(0.0),
             relative_scale: 1.0,
         }
     }

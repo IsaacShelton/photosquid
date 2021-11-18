@@ -11,9 +11,10 @@ use crate::{
     interaction::Interaction,
     interaction_options::InteractionOptions,
     math_helpers::angle_difference,
-    ocean::NewSelection,
     render_ctx::RenderCtx,
+    selection::NewSelection,
 };
+use angular_units::Rad;
 use nalgebra_glm as glm;
 use slotmap::new_key_type;
 use std::{
@@ -50,7 +51,7 @@ pub trait Squid {
     fn translate(&mut self, delta: &glm::Vec2, options: &InteractionOptions);
 
     // Rotates a squid body
-    fn rotate(&mut self, delta_theta: f32, options: &InteractionOptions);
+    fn rotate(&mut self, delta_theta: Rad<f32>, options: &InteractionOptions);
 
     // Scales a squid body
     fn scale(&mut self, total_scale_factor: f32, options: &InteractionOptions);
@@ -145,8 +146,8 @@ pub fn common_context_menu(underneath: &glm::Vec2, color_scheme: &ColorScheme) -
     )
 }
 
-pub fn get_point_delta_rotation(screen_position: &glm::Vec2, mouse_position: &glm::Vec2, old_rotation: f32) -> f32 {
-    let new_rotation = -1.0 * (mouse_position.y - screen_position.y).atan2(mouse_position.x - screen_position.x);
+pub fn get_point_delta_rotation(screen_position: &glm::Vec2, mouse_position: &glm::Vec2, old_rotation: Rad<f32>) -> Rad<f32> {
+    let new_rotation = Rad(-1.0 * (mouse_position.y - screen_position.y).atan2(mouse_position.x - screen_position.x));
     angle_difference(old_rotation, new_rotation)
 }
 

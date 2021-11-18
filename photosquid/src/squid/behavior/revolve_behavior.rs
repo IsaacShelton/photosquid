@@ -1,4 +1,5 @@
 use crate::{accumulator::Accumulator, interaction_options::InteractionOptions, math_helpers::angle_difference};
+use angular_units::{Angle, Rad};
 use nalgebra_glm as glm;
 
 #[derive(Copy, Clone)]
@@ -7,15 +8,15 @@ pub struct RevolveBehavior {
     origin: glm::Vec2,
     start: glm::Vec2,
     point: glm::Vec2,
-    accumulator: Accumulator<f32>,
-    rotation: f32,
+    accumulator: Accumulator<Rad<f32>>,
+    rotation: Rad<f32>,
 }
 
 pub struct Expression {
-    pub origin_rotation: f32,
+    pub origin_rotation: Rad<f32>,
     pub origin: glm::Vec2,
     pub start: glm::Vec2,
-    pub delta_object_rotation: f32,
+    pub delta_object_rotation: Rad<f32>,
 }
 
 impl Expression {
@@ -39,7 +40,7 @@ impl RevolveBehavior {
             let mu1 = (current - self.origin).as_angle();
             let total_delta_mu = mu0 - mu1;
 
-            let raw_delta_rotation = angle_difference(self.rotation + self.accumulator.residue(), total_delta_mu);
+            let raw_delta_rotation = angle_difference(self.rotation + *self.accumulator.residue(), total_delta_mu);
             let delta_rotation = self.accumulator.accumulate(&raw_delta_rotation, options.rotation_snapping).unwrap_or_default();
 
             self.rotation += delta_rotation;
@@ -59,7 +60,7 @@ impl RevolveBehavior {
         self.start = *start;
         self.point = *point;
         self.revolving = true;
-        self.rotation = 0.0;
+        self.rotation = Rad(0.0);
     }
 
     pub fn unset(&mut self) {
@@ -75,7 +76,7 @@ impl Default for RevolveBehavior {
             start: glm::zero(),
             point: glm::zero(),
             accumulator: Accumulator::new(),
-            rotation: 0.0,
+            rotation: Rad(0.0),
         }
     }
 }

@@ -1,3 +1,4 @@
+use angular_units::{Angle, Rad};
 use nalgebra_glm as glm;
 
 pub trait DivOrZero {
@@ -25,23 +26,22 @@ impl DivOrZero for f64 {
 }
 
 pub trait AsAngle {
-    fn as_angle(&self) -> f32;
+    fn as_angle(&self) -> Rad<f32>;
 }
 
 impl AsAngle for glm::Vec2 {
-    fn as_angle(&self) -> f32 {
-        self.y.atan2(self.x)
+    fn as_angle(&self) -> Rad<f32> {
+        Rad(self.y.atan2(self.x))
     }
 }
 
-pub fn angle_difference(alpha: f32, beta: f32) -> f32 {
+pub fn angle_difference(alpha: Rad<f32>, beta: Rad<f32>) -> Rad<f32> {
     use std::f32::consts::{PI, TAU};
+
+    let alpha = alpha.scalar();
+    let beta = beta.scalar();
 
     let difference = (beta - alpha + PI) % TAU - PI;
 
-    if difference < -PI {
-        difference + TAU
-    } else {
-        difference
-    }
+    Rad(if difference < -PI { difference + TAU } else { difference })
 }

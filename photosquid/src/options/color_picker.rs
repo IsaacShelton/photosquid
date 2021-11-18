@@ -12,8 +12,8 @@ pub struct ColorPicker {
     y: f32,
 }
 
-impl ColorPicker {
-    pub fn new() -> Self {
+impl Default for ColorPicker {
+    fn default() -> Self {
         Self {
             is_selecting_hue_value: false,
             is_selecting_saturation: false,
@@ -23,7 +23,9 @@ impl ColorPicker {
             y: 64.0,
         }
     }
+}
 
+impl ColorPicker {
     // Sets the selected color in the color picker without triggering a color change notification
     pub fn set_selected_color_no_notif(&mut self, color: Color) {
         let (h, s, v) = color.to_hsv();

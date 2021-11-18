@@ -1,13 +1,8 @@
 pub mod layers;
 pub mod object;
 
-use crate::{
-    app::ApplicationState,
-    capture::Capture,
-    interaction::Interaction,
-    ocean::{Ocean, Selection},
-    render_ctx::RenderCtx,
-};
+use crate::{app::ApplicationState, capture::Capture, interaction::Interaction, ocean::Ocean, render_ctx::RenderCtx, selection::Selection};
+
 use glium_text_rusttype::{FontTexture, TextSystem};
 use slotmap::new_key_type;
 use std::rc::Rc;

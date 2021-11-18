@@ -7,11 +7,11 @@ use crate::{
     context_menu::ContextMenu,
     interaction::Interaction,
     interaction_options::InteractionOptions,
-    math_helpers::{angle_difference, DivOrZero},
+    math_helpers::DivOrZero,
     matrix_helpers::reach_inside_mat4,
     mesh::MeshXyz,
-    ocean::{NewSelection, NewSelectionInfo, Selection},
     render_ctx::RenderCtx,
+    selection::{NewSelection, NewSelectionInfo, Selection},
     smooth::{Lerpable, MultiLerp, NoLerp, Smooth},
     squid::{
         self,
@@ -19,6 +19,7 @@ use crate::{
         PreviewParams,
     },
 };
+use angular_units::{Angle, Rad};
 use glium::{glutin::event::MouseButton, Display};
 use nalgebra_glm as glm;
 use std::time::{Duration, Instant};
@@ -45,8 +46,8 @@ pub struct Tri {
 
     // Rotate
     rotating: bool,
-    rotation_accumulator: Accumulator<f32>,
-    virtual_rotation: f32, // Rotation that only applies to the handle
+    rotation_accumulator: Accumulator<Rad<f32>>,
+    virtual_rotation: Rad<f32>, // Rotation that only applies to the handle
 
     // Scale
     prescale_size: [glm::Vec2; 3],
@@ -64,7 +65,7 @@ pub struct TriData {
     p2: MultiLerp<glm::Vec2>,
     p3: MultiLerp<glm::Vec2>,
     color: NoLerp<Color>,
-    rotation: f32,
+    rotation: Rad<f32>,
 }
 
 impl Lerpable for TriData {
@@ -75,14 +76,14 @@ impl Lerpable for TriData {
             p1: Lerpable::lerp(&self.p1, &other.p1, scalar),
             p2: Lerpable::lerp(&self.p2, &other.p2, scalar),
             p3: Lerpable::lerp(&self.p3, &other.p3, scalar),
-            rotation: interpolation::Lerp::lerp(&self.rotation, &other.rotation, scalar),
+            rotation: angular_units::Interpolate::interpolate(&self.rotation, &other.rotation, *scalar),
             color: Lerpable::lerp(&self.color, &other.color, scalar),
         }
     }
 }
 
 impl Tri {
-    pub fn new(p1: glm::Vec2, p2: glm::Vec2, p3: glm::Vec2, rotation: f32, color: Color) -> Self {
+    pub fn new(p1: glm::Vec2, p2: glm::Vec2, p3: glm::Vec2, rotation: Rad<f32>, color: Color) -> Self {
         let data = TriData {
             p1: MultiLerp::From(p1),
             p2: MultiLerp::From(p2),
@@ -111,7 +112,7 @@ impl Tri {
             translate_behavior: Default::default(),
             rotating: false,
             rotation_accumulator: Accumulator::new(),
-            virtual_rotation: 0.0,
+            virtual_rotation: Rad(0.0),
             prescale_size: [p1 - center, p2 - center, p3 - center],
             spread_behavior: Default::default(),
             revolve_behavior: Default::default(),
@@ -171,7 +172,7 @@ impl Tri {
 
         [p1.reveal() - center, p2.reveal() - center, p3.reveal() - center]
             .iter()
-            .map(|p| glm::rotate_vec2(p, -rotation) + center + camera)
+            .map(|p| glm::rotate_vec2(p, -rotation.scalar()) + center + camera)
             .collect()
     }
 
@@ -207,25 +208,14 @@ impl Tri {
         )
     }
 
-    fn get_delta_rotation(&self, mouse_position: &glm::Vec2, camera: &glm::Vec2) -> f32 {
-        let real = self.data.get_real();
-        let center = self.get_real_center();
-        let screen_center = center + camera;
-
-        let old_rotation = real.rotation + self.rotation_accumulator.residue() + self.virtual_rotation;
-        let new_rotation = -1.0 * (mouse_position.y - screen_center.y).atan2(mouse_position.x - screen_center.x);
-
-        angle_difference(old_rotation, new_rotation)
-    }
-
     fn reposition_point(&mut self, mouse_position: &glm::Vec2, camera: &glm::Vec2) {
         let real = self.data.get_real();
         let rotation = self.data.get_real().rotation;
         let center = self.get_real_center();
 
-        let mut p1 = glm::rotate_vec2(&(real.p1.reveal() - center), -rotation);
-        let mut p2 = glm::rotate_vec2(&(real.p2.reveal() - center), -rotation);
-        let mut p3 = glm::rotate_vec2(&(real.p3.reveal() - center), -rotation);
+        let mut p1 = glm::rotate_vec2(&(real.p1.reveal() - center), -rotation.scalar());
+        let mut p2 = glm::rotate_vec2(&(real.p2.reveal() - center), -rotation.scalar());
+        let mut p3 = glm::rotate_vec2(&(real.p3.reveal() - center), -rotation.scalar());
 
         let new_p = glm::rotate_vec2(&(mouse_position - camera - center), 0.0);
 
@@ -243,7 +233,7 @@ impl Tri {
         // Set new data as the new target points, with zero rotation applied
 
         // HACK: Instantly snap rotation back to 0.0
-        if real.rotation != 0.0 {
+        if real.rotation.scalar() != 0.0 {
             self.virtual_rotation += real.rotation;
 
             {
@@ -251,7 +241,7 @@ impl Tri {
                 mut_real.p1 = MultiLerp::From(p1);
                 mut_real.p2 = MultiLerp::From(p2);
                 mut_real.p3 = MultiLerp::From(p3);
-                mut_real.rotation = 0.0;
+                mut_real.rotation = Rad(0.0);
             }
 
             {
@@ -259,7 +249,7 @@ impl Tri {
                 mut_previous.p1 = MultiLerp::From(p1);
                 mut_previous.p2 = MultiLerp::From(p2);
                 mut_previous.p3 = MultiLerp::From(p3);
-                mut_previous.rotation = 0.0;
+                mut_previous.rotation = Rad(0.0);
             }
         } else {
             let mut new_real = *self.data.get_real();
@@ -360,7 +350,7 @@ impl Squid for Tri {
             transformation = glm::translation(&glm::vec2_to_vec3(&center));
         }
 
-        transformation = glm::rotate(&transformation, rotation, &glm::vec3(0.0, 0.0, -1.0));
+        transformation = glm::rotate(&transformation, rotation.scalar(), &glm::vec3(0.0, 0.0, -1.0));
         transformation = glm::translate(&transformation, &glm::vec2_to_vec3(&(-center)));
 
         let view = if as_preview.is_some() {
@@ -441,12 +431,22 @@ impl Squid for Tri {
                     return Capture::AllowDrag;
                 }
             }
-            Interaction::Drag { delta, current, .. } => {
+            Interaction::Drag {
+                delta,
+                current: mouse_position,
+                ..
+            } => {
                 if self.moving_point.is_some() {
-                    self.reposition_point(current, camera);
+                    self.reposition_point(mouse_position, camera);
                 } else if self.rotating {
                     return Capture::RotateSelectedSquids {
-                        delta_theta: self.get_delta_rotation(current, camera),
+                        delta_theta: squid::behavior::get_delta_rotation(
+                            &self.get_real_center(),
+                            self.data.get_real().rotation + self.virtual_rotation,
+                            mouse_position,
+                            &self.rotation_accumulator,
+                            camera,
+                        ),
                     };
                 } else if self.translate_behavior.moving {
                     return Capture::MoveSelectedSquids { delta: *delta };
@@ -467,9 +467,9 @@ impl Squid for Tri {
     fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool {
         let real = self.data.get_real();
         let center = self.get_real_center();
-        let p1 = glm::rotate_vec2(&(real.p1.reveal() - center), -real.rotation) + center + camera;
-        let p2 = glm::rotate_vec2(&(real.p2.reveal() - center), -real.rotation) + center + camera;
-        let p3 = glm::rotate_vec2(&(real.p3.reveal() - center), -real.rotation) + center + camera;
+        let p1 = glm::rotate_vec2(&(real.p1.reveal() - center), -real.rotation.scalar()) + center + camera;
+        let p2 = glm::rotate_vec2(&(real.p2.reveal() - center), -real.rotation.scalar()) + center + camera;
+        let p3 = glm::rotate_vec2(&(real.p3.reveal() - center), -real.rotation.scalar()) + center + camera;
         Self::is_point_inside_triangle(underneath, &p1, &p2, &p3)
     }
 
@@ -485,7 +485,7 @@ impl Squid for Tri {
         }
     }
 
-    fn rotate(&mut self, raw_delta_theta: f32, options: &InteractionOptions) {
+    fn rotate(&mut self, raw_delta_theta: Rad<f32>, options: &InteractionOptions) {
         if let Some(delta_theta) = self.rotation_accumulator.accumulate(&raw_delta_theta, options.rotation_snapping) {
             let mut new_data = *self.data.get_real();
             new_data.rotation += delta_theta;

@@ -35,12 +35,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "almost"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aa2999eb46af81abb65c2d30d446778d7e613b60bbf4e174a027e80f90a3c14"
-
-[[package]]
 name = "andrew"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -58,6 +52,16 @@ name = "android_glue"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "000444226fcff248f2bc4c7625be32c63caccfecc2723a2b9f78a7487a49c407"
+
+[[package]]
+name = "angular-units"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f1c36cde4b75aa8518ad38880fdc7b649d7bf22b359a296964756e2319d598d"
+dependencies = [
+ "approx 0.3.2",
+ "num-traits 0.2.14",
+]
 
 [[package]]
 name = "approx"
@@ -1328,7 +1332,7 @@ dependencies = [
 name = "photosquid"
 version = "0.1.0"
 dependencies = [
- "almost",
+ "angular-units",
  "enum-as-inner",
  "glium",
  "glium_text_rusttype",

@@ -2,6 +2,7 @@ use crate::{
     app::ApplicationState, capture::Capture, interaction::Interaction, render_ctx::RenderCtx, squid::Rect as RectSquid, text_input::TextInput, tool,
     tool::Tool, user_input::UserInput,
 };
+use angular_units::Rad;
 use glium::glutin::event::MouseButton;
 use glium_text_rusttype::{FontTexture, TextSystem};
 use std::rc::Rc;
@@ -14,7 +15,7 @@ pub struct Rect {
     // Tool options
     initial_width: f32,
     initial_height: f32,
-    initial_rotation: f32,
+    initial_rotation: Rad<f32>,
 }
 
 impl Rect {
@@ -26,7 +27,7 @@ impl Rect {
 
             initial_width: 100.0,
             initial_height: 100.0,
-            initial_rotation: 0.0,
+            initial_rotation: Rad(0.0),
         }
     }
 }
@@ -43,7 +44,7 @@ impl Tool for Rect {
         }
 
         if let Some(new_content) = self.rotation_input.as_text_input_mut().unwrap().poll() {
-            self.initial_rotation = new_content.parse::<f32>().unwrap_or_default().max(0.0) * std::f32::consts::PI / 180.0;
+            self.initial_rotation = Rad(new_content.parse::<f32>().unwrap_or_default().max(0.0) * std::f32::consts::PI / 180.0);
         }
 
         // Handle interaction

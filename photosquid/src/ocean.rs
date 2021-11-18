@@ -1,30 +1,13 @@
 use crate::{
     annotations::UnsafeTemporary,
-    app::selection_contains,
-    color::Color,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
     layer::Layer,
-    squid::{self, Squid, SquidLimbRef, SquidRef},
+    selection::{selection_contains, Selection, TrySelectResult},
+    squid::{self, Squid, SquidRef},
 };
 use nalgebra_glm as glm;
 use slotmap::SlotMap;
-
-#[derive(Copy, Clone)]
-pub struct Selection {
-    pub squid_id: SquidRef,
-    pub limb_id: Option<SquidLimbRef>,
-}
-
-impl Selection {
-    pub fn new(squid_id: SquidRef, limb_id: Option<SquidLimbRef>) -> Self {
-        Self { squid_id, limb_id }
-    }
-}
-
-pub struct NewSelectionInfo {
-    pub color: Option<Color>,
-}
 
 // A world that objects (aka squids) live in
 // NOTE: Only use direct access if you know what you're doing
@@ -44,15 +27,20 @@ pub struct Ocean {
 // Using #[allow(deprecated)] to silence warnings about manually accessing internal
 // fields of 'Ocean' struct
 #[allow(deprecated)]
-impl Ocean {
-    pub fn new() -> Self {
+impl Default for Ocean {
+    fn default() -> Self {
         Self {
             current_layer: 0,
             layers: vec![Default::default()],
             squids: SlotMap::with_key(),
         }
     }
+}
 
+// Using #[allow(deprecated)] to silence warnings about manually accessing internal
+// fields of 'Ocean' struct
+#[allow(deprecated)]
+impl Ocean {
     pub fn insert(&mut self, value: Box<dyn Squid>) -> SquidRef {
         let reference = self.squids.insert(value);
 
@@ -151,15 +139,4 @@ impl Ocean {
 
         None
     }
-}
-
-pub struct NewSelection {
-    pub selection: Selection,
-    pub info: NewSelectionInfo,
-}
-
-pub enum TrySelectResult {
-    New(NewSelection),
-    Preserve,
-    Discard,
 }

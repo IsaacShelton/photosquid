@@ -2,16 +2,20 @@ use crate::{
     capture::Capture,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
+    dragging::Dragging,
+    history::History,
     interaction::Interaction,
     interaction_options::InteractionOptions,
     mesh::{MeshXyz, MeshXyzUv},
-    ocean::{Ocean, Selection},
+    ocean::Ocean,
+    selection::{selection_contains, Selection},
     shaders::Shaders,
     smooth::Smooth,
     squid::{Initiation, Squid, SquidRef},
     tool::{Tool, ToolKey},
     toolbox::ToolBox,
 };
+use angular_units::Rad;
 use glium::{
     glutin::{
         dpi::LogicalPosition,
@@ -59,7 +63,7 @@ pub struct ApplicationState {
 }
 
 pub enum Operation {
-    Rotate { point: glm::Vec2, rotation: f32 },
+    Rotate { point: glm::Vec2, rotation: Rad<f32> },
     Scale { point: glm::Vec2, origin: glm::Vec2 },
     Spread { point: glm::Vec2, origin: glm::Vec2 },
     Revolve { point: glm::Vec2, origin: glm::Vec2 },
@@ -239,7 +243,7 @@ impl ApplicationState {
 
                 if let Some(rotate_point) = self.get_closest_selection_center(&position) {
                     let point = rotate_point + camera;
-                    let rotation = (rotate_point.y - position.y).atan2(position.x - rotate_point.x) - std::f32::consts::FRAC_PI_2;
+                    let rotation = Rad((rotate_point.y - position.y).atan2(position.x - rotate_point.x)) - Rad::pi_over_2();
                     self.operation = Some(Operation::Rotate { point, rotation });
                 }
             }
@@ -332,102 +336,4 @@ impl ApplicationState {
         let camera = self.camera.get_animated();
         glm::vec2(mouse.x, mouse.y) - camera
     }
-}
-
-pub struct History {
-    history: Vec<Ocean>,
-    time_travel: usize,
-}
-
-impl History {
-    const MAX_HISTORY: usize = 100;
-
-    pub fn new() -> Self {
-        Self {
-            history: vec![],
-            time_travel: 0,
-        }
-    }
-
-    pub fn push(&mut self, value: Ocean) {
-        if self.history.is_empty() {
-            self.history.push(Ocean::new());
-        } else {
-            while self.time_travel < self.history.len() - 1 {
-                self.history.pop();
-            }
-        }
-
-        while self.history.len() >= Self::MAX_HISTORY {
-            self.history.remove(0);
-            self.time_travel -= 1;
-        }
-
-        self.history.push(value);
-        self.time_travel = self.history.len() - 1;
-    }
-
-    pub fn undo(&mut self) -> Option<Ocean> {
-        if self.time_travel > 0 {
-            self.time_travel -= 1;
-            let in_the_past = self.history[self.time_travel].clone();
-            Some(in_the_past)
-        } else {
-            None
-        }
-    }
-
-    pub fn redo(&mut self) -> Option<Ocean> {
-        if self.time_travel + 1 < self.history.len() {
-            self.time_travel += 1;
-            let towards_present = self.history[self.time_travel].clone();
-            Some(towards_present)
-        } else {
-            None
-        }
-    }
-}
-
-pub struct Dragging {
-    pub down: glm::Vec2,
-    pub current: glm::Vec2,
-    pub last: glm::Vec2,
-}
-
-impl Dragging {
-    pub fn new(mouse_position: LogicalPosition<f32>) -> Self {
-        let position: glm::Vec2 = glm::vec2(mouse_position.x, mouse_position.y);
-
-        Self {
-            down: position,
-            current: position,
-            last: position,
-        }
-    }
-
-    pub fn update(&mut self, mouse_position: glm::Vec2) {
-        self.last = self.current;
-        self.current = mouse_position;
-    }
-
-    pub fn get_delta(&self) -> glm::Vec2 {
-        self.current - self.last
-    }
-
-    pub fn to_interaction(&self) -> Interaction {
-        Interaction::Drag {
-            delta: self.get_delta(),
-            start: self.down,
-            current: self.current,
-        }
-    }
-}
-
-pub fn selection_contains(selections: &[Selection], squid_reference: SquidRef) -> bool {
-    for selection in selections.iter() {
-        if selection.squid_id == squid_reference {
-            return true;
-        }
-    }
-    false
 }

@@ -2,13 +2,14 @@ use super::{Capture, Interaction, KeyCapture, Tool};
 use crate::{
     app::{ApplicationState, Operation},
     bool_poll,
-    ocean::{NewSelection, TrySelectResult},
     render_ctx::RenderCtx,
+    selection::{NewSelection, TrySelectResult},
     squid::{self, Initiation},
     text_input::TextInput,
     tool,
     user_input::UserInput,
 };
+use angular_units::Rad;
 use glium::glutin::event::{MouseButton, VirtualKeyCode};
 use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;
@@ -98,102 +99,98 @@ impl Pointer {
             _ => Capture::Miss,
         }
     }
-}
 
-impl Tool for Pointer {
-    fn interact(&mut self, interaction: Interaction, app: &mut ApplicationState) -> Capture {
-        // Update options
+    fn poll_options(&mut self, app: &mut ApplicationState) {
         if let Some(new_content) = self.translation_snapping_input.as_text_input_mut().unwrap().poll() {
             app.interaction_options.translation_snapping = new_content.parse::<f32>().unwrap_or_default().max(1.0);
         }
 
         if let Some(new_content) = self.rotation_snapping_input.as_text_input_mut().unwrap().poll() {
-            app.interaction_options.rotation_snapping = new_content.parse::<f32>().unwrap_or_default().max(0.0) * std::f32::consts::PI / 180.0;
+            app.interaction_options.rotation_snapping = Rad(new_content.parse::<f32>().unwrap_or_default().max(0.0) * std::f32::consts::PI / 180.0);
         }
+    }
 
-        // Pre-notify all squids of incoming click if applicable
-        // (used for resetting internal states)
-        if let Interaction::Click { .. } = interaction {
-            app.preclick();
-        }
-
-        if let Interaction::Drag { current, .. } = interaction {
-            match &mut app.operation {
-                Some(Operation::Rotate { point, rotation }) => {
-                    let delta_theta = squid::get_point_delta_rotation(point, &current, *rotation) - std::f32::consts::FRAC_PI_2;
-                    *rotation += delta_theta;
-                    return Capture::RotateSelectedSquids { delta_theta };
-                }
-                Some(Operation::Scale { origin, point }) => {
-                    let d0 = glm::distance(origin, point);
-                    let df = glm::distance(origin, &(current - app.camera.get_animated()));
-                    let total_scale_factor = df / d0;
-                    return Capture::ScaleSelectedSquids { total_scale_factor };
-                }
-                Some(Operation::Spread { .. }) => {
-                    return Capture::SpreadSelectedSquids { current };
-                }
-                Some(Operation::Revolve { .. }) => {
-                    return Capture::RevolveSelectedSquids { current };
-                }
-                None => (),
+    fn dispatch_drag(app: &mut ApplicationState, mouse_position: &glm::Vec2) -> Capture {
+        match &mut app.operation {
+            Some(Operation::Rotate { point, rotation }) => {
+                let delta_theta = squid::get_point_delta_rotation(point, mouse_position, *rotation) - Rad::pi_over_2();
+                *rotation += delta_theta;
+                Capture::RotateSelectedSquids { delta_theta }
             }
+            Some(Operation::Scale { origin, point }) => {
+                let d0 = glm::distance(origin, point);
+                let df = glm::distance(origin, &(mouse_position - app.camera.get_animated()));
+                let total_scale_factor = df / d0;
+                Capture::ScaleSelectedSquids { total_scale_factor }
+            }
+            Some(Operation::Spread { .. }) => Capture::SpreadSelectedSquids { current: *mouse_position },
+            Some(Operation::Revolve { .. }) => Capture::RevolveSelectedSquids { current: *mouse_position },
+            None => Capture::Miss,
         }
+    }
 
-        let mouse = if let Some(position) = app.mouse_position {
-            glm::vec2(position.x, position.y)
+    fn dispatch_key(app: &mut ApplicationState, virtual_keycode: VirtualKeyCode) -> Capture {
+        app.try_interact_with_selections(&Interaction::Key { virtual_keycode })?;
+        Self::handle_hotkey(app, virtual_keycode)
+    }
+
+    fn try_open_context_menu(app: &mut ApplicationState, position: &glm::Vec2) -> Capture {
+        app.context_menu = app.ocean.try_context_menu(position, &app.camera.get_animated(), &app.color_scheme);
+
+        if app.context_menu.is_some() {
+            Capture::NoDrag
         } else {
-            glm::zero()
-        };
-
-        let possible_selection = self.try_select(&mouse, app);
-
-        // First off
-        // If we can interact with existing selections, prefer that over selecting different objects
-        if if let Interaction::Click { .. } = interaction {
-            matches!(possible_selection, TrySelectResult::New { .. })
-        } else {
-            true
-        } {
-            app.try_interact_with_selections(&interaction)?;
+            Capture::Miss
         }
+    }
+}
 
-        // Otherwise, If we can't interact with the existing selections, then try to select/de-select if applicable
+impl Tool for Pointer {
+    fn interact(&mut self, interaction: Interaction, app: &mut ApplicationState) -> Capture {
+        self.poll_options(app);
+
         match interaction {
-            Interaction::Click { button: MouseButton::Left, .. } => {
-                // Left Click - Try to select
-                Self::handle_try_select_result(possible_selection, app);
-            }
-            Interaction::Click {
-                button: MouseButton::Right,
-                position,
-            } => {
-                // Right Click - Try to open context menu
-                Self::handle_try_select_result(self.try_select(&position, app), app);
-                app.context_menu = app.ocean.try_context_menu(&position, &app.camera.get_animated(), &app.color_scheme);
+            Interaction::Click { button, position, .. } => {
+                app.preclick();
 
-                if app.context_menu.is_some() {
-                    return Capture::NoDrag;
+                let possible_selection = self.try_select(&position, app);
+
+                if !matches!(possible_selection, TrySelectResult::New { .. }) {
+                    app.try_interact_with_selections(&interaction)?;
                 }
-            }
-            Interaction::Key { virtual_keycode } => return Self::handle_hotkey(app, virtual_keycode),
-            _ => (),
-        }
 
-        Capture::AllowDrag
+                Self::handle_try_select_result(possible_selection, app);
+
+                if button == MouseButton::Right {
+                    Self::try_open_context_menu(app, &position)?;
+                }
+
+                Capture::AllowDrag
+            }
+            Interaction::Drag { current: mouse_position, .. } => {
+                Self::dispatch_drag(app, &mouse_position)?;
+                app.try_interact_with_selections(&interaction)?;
+                Capture::AllowDrag
+            }
+            Interaction::Key { virtual_keycode } => Self::dispatch_key(app, virtual_keycode),
+            _ => {
+                app.try_interact_with_selections(&interaction)?;
+                Capture::AllowDrag
+            }
+        }
     }
 
     fn interact_options(&mut self, interaction: Interaction, app: &mut ApplicationState) -> Capture {
+        use VirtualKeyCode::Escape;
+
         tool::interact_user_inputs(vec![&mut self.translation_snapping_input, &mut self.rotation_snapping_input], interaction, app)?;
 
-        if let Interaction::Key { virtual_keycode } = interaction {
-            if virtual_keycode == VirtualKeyCode::Escape {
-                app.selections.clear();
-                return Capture::Keyboard(KeyCapture::Capture);
-            }
+        if let Interaction::Key { virtual_keycode: Escape } = interaction {
+            app.selections.clear();
+            Capture::Keyboard(KeyCapture::Capture)
+        } else {
+            Capture::Miss
         }
-
-        Capture::Miss
     }
 
     fn render_options(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>) {

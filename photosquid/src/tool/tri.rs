@@ -2,6 +2,7 @@ use crate::{
     app::ApplicationState, capture::Capture, interaction::Interaction, render_ctx::RenderCtx, squid::Tri as TriSquid, text_input::TextInput, tool, tool::Tool,
     user_input::UserInput,
 };
+use angular_units::Rad;
 use glium::glutin::event::MouseButton;
 use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;
@@ -11,14 +12,14 @@ pub struct Tri {
     rotation_input: UserInput,
 
     // Tool options
-    initial_rotation: f32,
+    initial_rotation: Rad<f32>,
 }
 
 impl Tri {
     pub fn new() -> Tri {
         Self {
             rotation_input: UserInput::TextInput(TextInput::new("0".into(), "Initial Rotation".into(), " degrees".into())),
-            initial_rotation: 0.0,
+            initial_rotation: Rad(0.0),
         }
     }
 }
@@ -27,7 +28,7 @@ impl Tool for Tri {
     fn interact(&mut self, interaction: Interaction, app: &mut ApplicationState) -> Capture {
         // Update options
         if let Some(new_content) = self.rotation_input.as_text_input_mut().unwrap().poll() {
-            self.initial_rotation = new_content.parse::<f32>().unwrap_or_default().max(0.0) * std::f32::consts::PI / 180.0;
+            self.initial_rotation = Rad(new_content.parse::<f32>().unwrap_or_default().max(0.0) * std::f32::consts::PI / 180.0);
         }
 
         // Handle interaction

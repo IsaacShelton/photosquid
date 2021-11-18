@@ -8,11 +8,11 @@ use crate::{
     context_menu::ContextMenu,
     interaction::Interaction,
     interaction_options::InteractionOptions,
-    math_helpers::{angle_difference, DivOrZero},
+    math_helpers::DivOrZero,
     matrix_helpers::reach_inside_mat4,
     mesh::MeshXyz,
-    ocean::{NewSelection, NewSelectionInfo, Selection},
     render_ctx::RenderCtx,
+    selection::{NewSelection, NewSelectionInfo, Selection},
     smooth::{Lerpable, MultiLerp, NoLerp, Smooth},
     squid::{
         self,
@@ -20,6 +20,7 @@ use crate::{
         PreviewParams,
     },
 };
+use angular_units::{self, Angle, Rad};
 use glium::glutin::event::MouseButton;
 use nalgebra_glm as glm;
 use std::time::{Duration, Instant};
@@ -40,7 +41,7 @@ pub struct Rect {
 
     // Rotate
     rotating: bool,
-    rotation_accumulator: Accumulator<f32>,
+    rotation_accumulator: Accumulator<Rad<f32>>,
 
     // Scale
     prescale_size: glm::Vec2,
@@ -58,7 +59,7 @@ pub struct RectData {
     w: f32,
     h: f32,
     color: NoLerp<Color>,
-    rotation: f32,
+    rotation: Rad<f32>,
 }
 
 impl Lerpable for RectData {
@@ -69,7 +70,7 @@ impl Lerpable for RectData {
             position: self.position.lerp(&other.position, scalar),
             w: interpolation::Lerp::lerp(&self.w, &other.w, scalar),
             h: interpolation::Lerp::lerp(&self.h, &other.h, scalar),
-            rotation: interpolation::Lerp::lerp(&self.rotation, &other.rotation, scalar),
+            rotation: angular_units::Interpolate::interpolate(&self.rotation, &other.rotation, *scalar),
             color: Lerpable::lerp(&self.color, &other.color, scalar),
         }
     }
@@ -105,7 +106,7 @@ fn get_corner_dependence(moving: CornerKind, dependent: CornerKind) -> CornerDep
 }
 
 impl Rect {
-    pub fn new(x: f32, y: f32, w: f32, h: f32, rotation: f32, color: Color) -> Self {
+    pub fn new(x: f32, y: f32, w: f32, h: f32, rotation: Rad<f32>, color: Color) -> Self {
         let data = RectData {
             position: MultiLerp::From(glm::vec2(x, y)),
             w,
@@ -147,7 +148,7 @@ impl Rect {
         [(1.0, 1.0), (-1.0, 1.0), (1.0, -1.0), (-1.0, -1.0f32)]
             .iter()
             .map(|&p| glm::vec2(p.0 * w / 2.0, p.1 * h / 2.0))
-            .map(|p| glm::rotate_vec2(&p, -1.0 * rotation))
+            .map(|p| glm::rotate_vec2(&p, -1.0 * rotation.scalar()))
             .collect()
     }
 
@@ -179,7 +180,7 @@ impl Rect {
         let target_position = *target_screen_position - camera - glm::vec2(real.position.reveal().x, real.position.reveal().y);
 
         // Rotate corners back into axis-aligned space
-        let rotation = real.rotation;
+        let rotation = real.rotation.scalar();
         let axis_aligned_relative_corners: Vec<glm::Vec2> = relative_corners.iter().map(|p| glm::rotate_vec2(p, rotation)).collect();
         let axis_aligned_target_position = glm::rotate_vec2(&target_position, rotation);
 
@@ -213,17 +214,6 @@ impl Rect {
         self.data.set(new_data);
     }
 
-    fn get_delta_rotation(&self, mouse_position: &glm::Vec2, camera: &glm::Vec2) -> f32 {
-        let real = self.data.get_real();
-        let screen_x = real.position.reveal().x + camera.x;
-        let screen_y = real.position.reveal().y + camera.y;
-
-        let old_rotation = real.rotation + self.rotation_accumulator.residue();
-        let new_rotation = -1.0 * (mouse_position.y - screen_y).atan2(mouse_position.x - screen_x) + if real.w < 0.0 { std::f32::consts::PI } else { 0.0 };
-
-        angle_difference(old_rotation, new_rotation)
-    }
-
     fn get_rotate_handle_location(&self, camera: &glm::Vec2) -> glm::Vec2 {
         let RectData { position, w, rotation, .. } = self.data.get_animated();
 
@@ -254,7 +244,7 @@ impl Squid for Rect {
             glm::translation(&glm::vec3(position.reveal().x, position.reveal().y, 0.0))
         };
 
-        transformation = glm::rotate(&transformation, rotation, &glm::vec3(0.0, 0.0, -1.0));
+        transformation = glm::rotate(&transformation, rotation.scalar(), &glm::vec3(0.0, 0.0, -1.0));
         transformation = glm::scale(&transformation, &glm::vec3(w, h, 0.0));
 
         if let Some(preview) = &as_preview {
@@ -348,12 +338,22 @@ impl Squid for Rect {
                     return Capture::AllowDrag;
                 }
             }
-            Interaction::Drag { delta, current, .. } => {
+            Interaction::Drag {
+                delta,
+                current: mouse_position,
+                ..
+            } => {
                 if self.moving_corner.is_some() {
-                    self.reposition_corner(current, camera);
+                    self.reposition_corner(mouse_position, camera);
                 } else if self.rotating {
                     return Capture::RotateSelectedSquids {
-                        delta_theta: self.get_delta_rotation(current, camera),
+                        delta_theta: squid::behavior::get_delta_rotation(
+                            &self.data.get_real().position.reveal(),
+                            self.data.get_real().rotation,
+                            mouse_position,
+                            &self.rotation_accumulator,
+                            camera,
+                        ),
                     };
                 } else if self.translate_behavior.moving {
                     return Capture::MoveSelectedSquids { delta: *delta };
@@ -381,7 +381,7 @@ impl Squid for Rect {
         }
     }
 
-    fn rotate(&mut self, raw_delta_theta: f32, options: &InteractionOptions) {
+    fn rotate(&mut self, raw_delta_theta: Rad<f32>, options: &InteractionOptions) {
         if let Some(delta_theta) = self.rotation_accumulator.accumulate(&raw_delta_theta, options.rotation_snapping) {
             let mut new_data = *self.data.get_real();
             new_data.rotation += delta_theta;

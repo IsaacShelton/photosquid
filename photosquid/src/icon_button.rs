@@ -1,4 +1,5 @@
 use crate::{color::Color, matrix_helpers::reach_inside_mat4, mesh::MeshXyz, press_animation::PressAnimation, render_ctx::RenderCtx, smooth::Smooth};
+use angular_units::Angle;
 use glium::Display;
 use nalgebra_glm as glm;
 use std::time::{Duration, Instant};
@@ -65,8 +66,8 @@ impl<T> IconButton<T> {
         let identity = glm::identity::<f32, 4>();
         let real_scale = animation_moment.relative_scale * self.relative_scale * 24.0 * 0.5; // (times 0.5 since icons are 2x2 meters)
         let transformation = glm::translation(&self.position);
-        let transformation = glm::rotate(&transformation, animation_moment.backwards_rotation, &glm::vec3(1.0, 0.0, 0.0));
-        let transformation = glm::rotate(&transformation, animation_moment.rotation, &glm::vec3(0.0, 0.0, -1.0));
+        let transformation = glm::rotate(&transformation, animation_moment.backwards_rotation.scalar(), &glm::vec3(1.0, 0.0, 0.0));
+        let transformation = glm::rotate(&transformation, animation_moment.rotation.scalar(), &glm::vec3(0.0, 0.0, -1.0));
         let transformation = glm::scale(&transformation, &glm::vec3(real_scale, real_scale, 0.0));
 
         let uniforms = glium::uniform! {

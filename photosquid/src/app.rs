@@ -8,6 +8,7 @@ use crate::{
     interaction_options::InteractionOptions,
     mesh::{MeshXyz, MeshXyzUv},
     ocean::Ocean,
+    operation::Operation,
     selection::{selection_contains, Selection},
     shaders::Shaders,
     smooth::Smooth,
@@ -60,13 +61,6 @@ pub struct ApplicationState {
     pub wait_for_stop_drag: bool,
     pub operation: Option<Operation>,
     pub perform_next_operation_collectively: bool,
-}
-
-pub enum Operation {
-    Rotate { point: glm::Vec2, rotation: Rad<f32> },
-    Scale { point: glm::Vec2, origin: glm::Vec2 },
-    Spread { point: glm::Vec2, origin: glm::Vec2 },
-    Revolve { point: glm::Vec2, origin: glm::Vec2 },
 }
 
 trait ControlOrCommand {
@@ -199,6 +193,13 @@ impl ApplicationState {
                     }
                 }
             }
+            Capture::DilateSelectedSquids { current } => {
+                for squid_id in self.get_selected_squids() {
+                    if let Some(squid) = self.ocean.get_mut(squid_id) {
+                        squid.dilate(current, &self.interaction_options);
+                    }
+                }
+            }
         }
     }
 
@@ -261,6 +262,9 @@ impl ApplicationState {
             }
             Initiation::Revolve { point, center } => {
                 self.operation = Some(Operation::Revolve { point, origin: center });
+            }
+            Initiation::Dilate { point, center } => {
+                self.operation = Some(Operation::Dilate { point, origin: center });
             }
         }
 

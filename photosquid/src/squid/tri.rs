@@ -15,7 +15,7 @@ use crate::{
     smooth::{Lerpable, MultiLerp, NoLerp, Smooth},
     squid::{
         self,
-        behavior::{RevolveBehavior, SpreadBehavior, TranslateBehavior},
+        behavior::{DilateBehavior, RevolveBehavior, SpreadBehavior, TranslateBehavior},
         PreviewParams,
     },
 };
@@ -57,6 +57,9 @@ pub struct Tri {
 
     // Revolve
     revolve_behavior: RevolveBehavior,
+
+    // Dilate
+    dilate_behavior: DilateBehavior,
 }
 
 #[derive(Copy, Clone)]
@@ -121,6 +124,7 @@ impl Tri {
             prescale_size: [p1 - center, p2 - center, p3 - center],
             spread_behavior: Default::default(),
             revolve_behavior: Default::default(),
+            dilate_behavior: Default::default(),
         }
     }
 
@@ -466,7 +470,6 @@ impl Squid for Tri {
                 self.moving_point = None;
                 self.translate_behavior.accumulator.clear();
                 self.rotation_accumulator.clear();
-                self.revolve_behavior.unset();
             }
             _ => (),
         }
@@ -530,6 +533,18 @@ impl Squid for Tri {
         }
     }
 
+    fn dilate(&mut self, point: &glm::Vec2, _options: &InteractionOptions) {
+        let expression = self.dilate_behavior.express(point);
+        let delta = expression.position - self.get_real_center();
+
+        let mut new_data = *self.data.get_real();
+        new_data.center = MultiLerp::Linear(new_data.center.reveal() + delta);
+        new_data.p1 = MultiLerp::Linear(expression.total_scale_factor * self.prescale_size[0]);
+        new_data.p2 = MultiLerp::Linear(expression.total_scale_factor * self.prescale_size[1]);
+        new_data.p3 = MultiLerp::Linear(expression.total_scale_factor * self.prescale_size[2]);
+        self.data.set(new_data);
+    }
+
     fn try_select(&self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection> {
         if self.is_point_over(underneath, camera) {
             Some(NewSelection {
@@ -590,6 +605,15 @@ impl Squid for Tri {
                 };
             }
             Initiation::Revolve { point, center } => self.revolve_behavior.set(&center, &self.get_center(), &point),
+            Initiation::Dilate { point, center } => {
+                let real = self.data.get_real();
+                self.prescale_size = [real.p1.reveal(), real.p2.reveal(), real.p3.reveal()];
+                self.dilate_behavior = DilateBehavior {
+                    point,
+                    origin: center,
+                    start: self.get_center(),
+                };
+            }
         }
     }
 

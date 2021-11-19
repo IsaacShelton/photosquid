@@ -1,7 +1,8 @@
 use super::{Capture, Interaction, KeyCapture, Tool};
 use crate::{
-    app::{ApplicationState, Operation},
+    app::ApplicationState,
     bool_poll,
+    operation::Operation,
     render_ctx::RenderCtx,
     selection::{NewSelection, TrySelectResult},
     squid::{self, Initiation},
@@ -89,7 +90,16 @@ impl Pointer {
                 Capture::Keyboard(KeyCapture::Capture)
             }
             VirtualKeyCode::S => {
-                app.initiate(Initiation::Scale);
+                if app.perform_next_operation_collectively.poll() {
+                    if let Some(center) = app.get_selection_group_center() {
+                        app.initiate(Initiation::Dilate {
+                            point: app.get_mouse_in_world_space(),
+                            center,
+                        });
+                    }
+                } else {
+                    app.initiate(Initiation::Scale);
+                }
                 Capture::Keyboard(KeyCapture::Capture)
             }
             VirtualKeyCode::C => {
@@ -125,6 +135,7 @@ impl Pointer {
             }
             Some(Operation::Spread { .. }) => Capture::SpreadSelectedSquids { current: *mouse_position },
             Some(Operation::Revolve { .. }) => Capture::RevolveSelectedSquids { current: *mouse_position },
+            Some(Operation::Dilate { .. }) => Capture::DilateSelectedSquids { current: *mouse_position },
             None => Capture::Miss,
         }
     }

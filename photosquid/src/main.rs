@@ -30,6 +30,7 @@ mod matrix_helpers;
 mod mesh;
 mod obj_helpers;
 mod ocean;
+mod operation;
 mod options;
 mod press_animation;
 mod render_ctx;
@@ -409,7 +410,19 @@ fn do_click(state: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn T
                         state.initiate(Initiation::Rotate);
                     }
                 }
-                ContextAction::ScaleSelected => state.initiate(Initiation::Scale),
+                ContextAction::ScaleSelected => {
+                    if state.perform_next_operation_collectively {
+                        if let Some(center) = state.get_selection_group_center() {
+                            state.initiate(Initiation::Dilate {
+                                point: state.get_mouse_in_world_space(),
+                                center,
+                            });
+                        }
+                        state.perform_next_operation_collectively = false;
+                    } else {
+                        state.initiate(Initiation::Scale);
+                    }
+                }
                 ContextAction::Collectively => state.perform_next_operation_collectively = !state.perform_next_operation_collectively,
             }
             return Capture::NoDrag;

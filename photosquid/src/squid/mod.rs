@@ -62,6 +62,9 @@ pub trait Squid {
     // Revolves a squid body around point
     fn revolve(&mut self, current: &glm::Vec2, options: &InteractionOptions);
 
+    // Dilates a squid body toward/from a point
+    fn dilate(&mut self, current: &glm::Vec2, options: &InteractionOptions);
+
     // Attempts to get a selection for this squid or a selection for a limb of this squid
     // under the point (x, y)
     fn try_select(&self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection>;
@@ -128,6 +131,7 @@ pub enum Initiation {
     Scale,
     Spread { point: glm::Vec2, center: glm::Vec2 },
     Revolve { point: glm::Vec2, center: glm::Vec2 },
+    Dilate { point: glm::Vec2, center: glm::Vec2 },
 }
 
 pub const HANDLE_RADIUS: f32 = 8.0;

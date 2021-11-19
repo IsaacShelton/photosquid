@@ -16,7 +16,7 @@ use crate::{
     smooth::{Lerpable, MultiLerp, NoLerp, Smooth},
     squid::{
         self,
-        behavior::{RevolveBehavior, SpreadBehavior, TranslateBehavior},
+        behavior::{DilateBehavior, RevolveBehavior, SpreadBehavior, TranslateBehavior},
         PreviewParams,
     },
 };
@@ -51,6 +51,9 @@ pub struct Rect {
 
     // Revolve
     revolve_behavior: RevolveBehavior,
+
+    // Dilate
+    dilate_behavior: DilateBehavior,
 }
 
 #[derive(Copy, Clone)]
@@ -84,27 +87,6 @@ enum CornerKind {
     XY = 0,
 }
 
-#[derive(Copy, Clone, PartialEq)]
-enum CornerDependence {
-    Neither,
-    Both,
-    X,
-    Y,
-}
-
-fn get_corner_dependence(moving: CornerKind, dependent: CornerKind) -> CornerDependence {
-    use CornerDependence::*;
-
-    //          dependent x,y  0,y  x,0   0,0
-    // moving
-    // x,y                xy   y    x     n/a
-    // 0,y                y    xy   n/a   x
-    // x,0                x    n/a  xy    y
-    // 0,0                n/a  x    y     xy
-    let table = [[Both, Y, X, Neither], [Y, Both, Neither, X], [X, Neither, Both, Y], [Neither, X, Y, Both]];
-    table[moving as usize][dependent as usize]
-}
-
 impl Rect {
     pub fn new(x: f32, y: f32, w: f32, h: f32, rotation: Rad<f32>, color: Color) -> Self {
         let data = RectData {
@@ -131,6 +113,7 @@ impl Rect {
             prescale_size: glm::vec2(data.w, data.h),
             spread_behavior: Default::default(),
             revolve_behavior: Default::default(),
+            dilate_behavior: Default::default(),
         }
     }
 
@@ -142,7 +125,7 @@ impl Rect {
     fn get_relative_corners(&self) -> Vec<glm::Vec2> {
         // Use non-animated version always for now?
         // It seems to look better this way
-        let RectData { w, h, .. } = self.data.get_real();
+        let RectData { w, h, .. } = self.data.get_animated();
         let RectData { rotation, .. } = self.data.get_animated();
 
         [(1.0, 1.0), (-1.0, 1.0), (1.0, -1.0), (-1.0, -1.0f32)]
@@ -170,47 +153,21 @@ impl Rect {
             .collect()
     }
 
-    fn reposition_corner(&mut self, target_screen_position: &glm::Vec2, camera: &glm::Vec2) {
-        use CornerDependence::*;
-        use CornerKind::*;
-
+    fn reposition_corner(&mut self, mouse: &glm::Vec2, camera: &glm::Vec2) {
         let real = self.data.get_real();
-        let moving_corner = self.moving_corner.unwrap();
-        let relative_corners = self.get_relative_corners();
-        let target_position = *target_screen_position - camera - glm::vec2(real.position.reveal().x, real.position.reveal().y);
-
-        // Rotate corners back into axis-aligned space
         let rotation = real.rotation.scalar();
-        let axis_aligned_relative_corners: Vec<glm::Vec2> = relative_corners.iter().map(|p| glm::rotate_vec2(p, rotation)).collect();
-        let axis_aligned_target_position = glm::rotate_vec2(&target_position, rotation);
+        let abs_size = 2.0 * glm::rotate_vec2(&(real.position.reveal() - (mouse + camera)), rotation);
 
-        let mut result: Vec<glm::Vec2> = vec![];
-        for (i, c) in axis_aligned_relative_corners.iter().enumerate() {
-            let other_corner = Self::get_corner_kind(i);
-            let dependence = get_corner_dependence(moving_corner, other_corner);
-
-            result.push(glm::vec2(
-                if dependence == Both || dependence == X {
-                    axis_aligned_target_position.x
-                } else {
-                    c.x
-                },
-                if dependence == Both || dependence == Y {
-                    axis_aligned_target_position.y
-                } else {
-                    c.y
-                },
-            ));
-        }
-
-        let new_w = result[XZero as usize].x - result[ZeroZero as usize].x;
-        let new_h = result[ZeroY as usize].y - result[ZeroZero as usize].y;
-        let delta_w = new_w - real.w;
-        let delta_h = new_h - real.h;
+        let new_size = abs_size.component_mul(&match self.moving_corner.unwrap() {
+            CornerKind::ZeroZero => glm::vec2(1.0, 1.0),
+            CornerKind::XZero => glm::vec2(-1.0, 1.0),
+            CornerKind::ZeroY => glm::vec2(1.0, -1.0),
+            CornerKind::XY => glm::vec2(-1.0, -1.0),
+        });
 
         let mut new_data = *real;
-        new_data.w += delta_w;
-        new_data.h += delta_h;
+        new_data.w = new_size.x;
+        new_data.h = new_size.y;
         self.data.set(new_data);
     }
 
@@ -415,6 +372,16 @@ impl Squid for Rect {
         }
     }
 
+    fn dilate(&mut self, point: &glm::Vec2, _options: &InteractionOptions) {
+        let expression = self.dilate_behavior.express(point);
+
+        let mut new_data = *self.data.get_real();
+        new_data.position = MultiLerp::Linear(expression.position);
+        new_data.w = expression.total_scale_factor * self.prescale_size.x;
+        new_data.h = expression.total_scale_factor * self.prescale_size.y;
+        self.data.set(new_data);
+    }
+
     fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool {
         let real = self.data.get_real();
         let corners: Vec<glm::Vec2> = self
@@ -481,6 +448,15 @@ impl Squid for Rect {
             }
             Initiation::Spread { point, center } => {
                 self.spread_behavior = SpreadBehavior {
+                    point,
+                    origin: center,
+                    start: self.get_center(),
+                };
+            }
+            Initiation::Dilate { point, center } => {
+                let real = self.data.get_real();
+                self.prescale_size = glm::vec2(real.w, real.h);
+                self.dilate_behavior = DilateBehavior {
                     point,
                     origin: center,
                     start: self.get_center(),

@@ -62,10 +62,6 @@ impl RevolveBehavior {
         self.revolving = true;
         self.rotation = Rad(0.0);
     }
-
-    pub fn unset(&mut self) {
-        self.revolving = false;
-    }
 }
 
 impl Default for RevolveBehavior {

@@ -14,6 +14,7 @@ pub enum Capture {
     ScaleSelectedSquids { total_scale_factor: f32 },
     SpreadSelectedSquids { current: glm::Vec2 },
     RevolveSelectedSquids { current: glm::Vec2 },
+    DilateSelectedSquids { current: glm::Vec2 },
 }
 
 #[derive(Debug, PartialEq)]

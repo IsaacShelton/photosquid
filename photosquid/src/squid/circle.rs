@@ -15,7 +15,7 @@ use crate::{
     smooth::{Lerpable, MultiLerp, NoLerp, Smooth},
     squid::{
         self,
-        behavior::{RevolveBehavior, SpreadBehavior, TranslateBehavior},
+        behavior::{DilateBehavior, RevolveBehavior, SpreadBehavior, TranslateBehavior},
         PreviewParams,
     },
 };
@@ -49,6 +49,9 @@ pub struct Circle {
 
     // Revolve
     revolve_behavior: RevolveBehavior,
+
+    // Dilate
+    dilate_behavior: DilateBehavior,
 }
 
 #[derive(Copy, Clone)]
@@ -95,6 +98,7 @@ impl Circle {
             prescale_size: data.radius,
             spread_behavior: Default::default(),
             revolve_behavior: Default::default(),
+            dilate_behavior: Default::default(),
         }
     }
 
@@ -259,6 +263,14 @@ impl Squid for Circle {
         self.data.set(new_data);
     }
 
+    fn dilate(&mut self, current: &glm::Vec2, _options: &InteractionOptions) {
+        let mut new_data = *self.data.get_real();
+        let expression = self.dilate_behavior.express(current);
+        new_data.position = MultiLerp::Linear(expression.position);
+        new_data.radius = self.prescale_size * expression.total_scale_factor;
+        self.data.set(new_data);
+    }
+
     fn revolve(&mut self, current: &glm::Vec2, options: &InteractionOptions) {
         if let Some(expression) = self.revolve_behavior.express(current, options) {
             let mut new_data = *self.data.get_real();
@@ -330,6 +342,14 @@ impl Squid for Circle {
                 };
             }
             Initiation::Revolve { point, center } => self.revolve_behavior.set(&center, &self.get_center(), &point),
+            Initiation::Dilate { point, center } => {
+                self.prescale_size = self.data.get_real().radius;
+                self.dilate_behavior = DilateBehavior {
+                    point,
+                    origin: center,
+                    start: self.get_center(),
+                };
+            }
         }
     }
 

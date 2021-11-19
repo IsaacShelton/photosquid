@@ -1,5 +1,6 @@
+- fix bug with right click 'revolve' operation not working on triangles
 - zoom in/out
-- translate/rotate/scale as group
+- scale as group
 - box select with pointer tool
 - select all/none (with context menu on pointer tool for empty space)
 - find way to have shortcut 'c' for "treat selection as group" and be visible to user

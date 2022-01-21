@@ -34,7 +34,7 @@ pub struct Rect {
     // --------- Tweaking parameters ---------
 
     // Move point
-    moving_corner: Option<CornerKind>,
+    moving_corner: Option<Corner>,
 
     // Translate
     translate_behavior: TranslateBehavior,
@@ -63,6 +63,7 @@ pub struct RectData {
     h: f32,
     color: NoLerp<Color>,
     rotation: Rad<f32>,
+    radii: f32,
 }
 
 impl Lerpable for RectData {
@@ -75,12 +76,13 @@ impl Lerpable for RectData {
             h: interpolation::Lerp::lerp(&self.h, &other.h, scalar),
             rotation: angular_units::Interpolate::interpolate(&self.rotation, &other.rotation, *scalar),
             color: Lerpable::lerp(&self.color, &other.color, scalar),
+            radii: interpolation::Lerp::lerp(&self.radii, &other.radii, scalar),
         }
     }
 }
 
 #[derive(Copy, Clone)]
-enum CornerKind {
+enum Corner {
     ZeroZero = 3,
     ZeroY = 1,
     XZero = 2,
@@ -88,13 +90,14 @@ enum CornerKind {
 }
 
 impl Rect {
-    pub fn new(x: f32, y: f32, w: f32, h: f32, rotation: Rad<f32>, color: Color) -> Self {
+    pub fn new(x: f32, y: f32, w: f32, h: f32, rotation: Rad<f32>, color: Color, radii: f32) -> Self {
         let data = RectData {
             position: MultiLerp::From(glm::vec2(x, y)),
             w,
             h,
             rotation,
             color: NoLerp(color),
+            radii,
         };
 
         Self::from_data(data)
@@ -117,8 +120,8 @@ impl Rect {
         }
     }
 
-    fn get_corner_kind(corner_index: usize) -> CornerKind {
-        use CornerKind::*;
+    fn get_corner_kind(corner_index: usize) -> Corner {
+        use Corner::*;
         [XY, ZeroY, XZero, ZeroZero][corner_index]
     }
 
@@ -159,16 +162,18 @@ impl Rect {
         let abs_size = 2.0 * glm::rotate_vec2(&(real.position.reveal() - (mouse + camera)), rotation);
 
         let new_size = abs_size.component_mul(&match self.moving_corner.unwrap() {
-            CornerKind::ZeroZero => glm::vec2(1.0, 1.0),
-            CornerKind::XZero => glm::vec2(-1.0, 1.0),
-            CornerKind::ZeroY => glm::vec2(1.0, -1.0),
-            CornerKind::XY => glm::vec2(-1.0, -1.0),
+            Corner::ZeroZero => glm::vec2(1.0, 1.0),
+            Corner::XZero => glm::vec2(-1.0, 1.0),
+            Corner::ZeroY => glm::vec2(1.0, -1.0),
+            Corner::XY => glm::vec2(-1.0, -1.0),
         });
 
         let mut new_data = *real;
         new_data.w = new_size.x;
         new_data.h = new_size.y;
         self.data.set(new_data);
+
+        self.mesh = None;
     }
 
     fn get_rotate_handle_location(&self, camera: &glm::Vec2) -> glm::Vec2 {
@@ -178,6 +183,21 @@ impl Rect {
             position.reveal().x + camera.x + rotation.cos() * (w * 0.5 + 24.0 * w.signum()),
             position.reveal().y + camera.y - rotation.sin() * (w * 0.5 + 24.0 * w.signum()),
         )
+    }
+
+    fn refresh_mesh(&mut self, ctx: &mut RenderCtx) {
+        // TODO: Don't refresh every frame (not trivial since radii/size animations require refreshing while active)
+
+        let real_data = self.data.get_real();
+        let animated_data = self.data.get_animated();
+
+        // Don't use margin of error
+        let has_radii_animation = real_data.radii != animated_data.radii;
+        let has_size_animation = real_data.w != animated_data.w || real_data.h != animated_data.h;
+
+        if self.mesh.is_none() || has_radii_animation || has_size_animation {
+            self.mesh = Some(MeshXyz::new_rect(ctx.display, animated_data.w, animated_data.h, animated_data.radii));
+        }
     }
 }
 
@@ -189,11 +209,10 @@ impl Squid for Rect {
             h,
             rotation,
             color,
+            ..
         } = self.data.get_animated();
 
-        if self.mesh.is_none() {
-            self.mesh = Some(MeshXyz::new_shape_square(ctx.display));
-        }
+        self.refresh_mesh(ctx);
 
         let mut transformation = if let Some(preview) = &as_preview {
             glm::translation(&glm::vec2_to_vec3(&preview.position))
@@ -202,10 +221,9 @@ impl Squid for Rect {
         };
 
         transformation = glm::rotate(&transformation, rotation.scalar(), &glm::vec3(0.0, 0.0, -1.0));
-        transformation = glm::scale(&transformation, &glm::vec3(w, h, 0.0));
 
         if let Some(preview) = &as_preview {
-            let max_size = w.max(h);
+            let max_size = w.abs().max(h.abs());
             let factor = 1.0.div_or_zero(max_size);
             transformation = glm::scale(&transformation, &glm::vec3(factor * preview.size, factor * preview.size, 0.0));
         }
@@ -303,6 +321,13 @@ impl Squid for Rect {
                 if self.moving_corner.is_some() {
                     self.reposition_corner(mouse_position, camera);
                 } else if self.rotating {
+                    // When the rectangle's width is negative, the rotation handle is PI radians ahead of it's angle
+                    // compared to the actual rotation of the shape,
+                    // So we have to compensate for the difference when that's the case.
+                    // It might be better to integrate this difference into the rotation and not allow negative
+                    // widths/heights for rectangles, but this is an easier way to do it
+                    let compensation = Rad(if self.data.get_animated().w < 0.0 { std::f32::consts::PI } else { 0.0 });
+
                     return Capture::RotateSelectedSquids {
                         delta_theta: squid::behavior::get_delta_rotation(
                             &self.data.get_real().position.reveal(),
@@ -310,7 +335,7 @@ impl Squid for Rect {
                             mouse_position,
                             &self.rotation_accumulator,
                             camera,
-                        ),
+                        ) + compensation,
                     };
                 } else if self.translate_behavior.moving {
                     return Capture::MoveSelectedSquids { delta: *delta };
@@ -351,6 +376,8 @@ impl Squid for Rect {
         new_data.w = total_scale_factor * self.prescale_size.x;
         new_data.h = total_scale_factor * self.prescale_size.y;
         self.data.set(new_data);
+
+        self.mesh = None;
     }
 
     fn spread(&mut self, point: &glm::Vec2, _options: &InteractionOptions) {
@@ -380,6 +407,8 @@ impl Squid for Rect {
         new_data.w = expression.total_scale_factor * self.prescale_size.x;
         new_data.h = expression.total_scale_factor * self.prescale_size.y;
         self.data.set(new_data);
+
+        self.mesh = None;
     }
 
     fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool {

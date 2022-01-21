@@ -11,11 +11,13 @@ pub struct Rect {
     width_input: UserInput,
     height_input: UserInput,
     rotation_input: UserInput,
+    radii_input: UserInput,
 
     // Tool options
     initial_width: f32,
     initial_height: f32,
     initial_rotation: Rad<f32>,
+    initial_radii: f32,
 }
 
 impl Rect {
@@ -24,10 +26,12 @@ impl Rect {
             width_input: UserInput::TextInput(TextInput::new("100".into(), "Initial Width".into(), "".into())),
             height_input: UserInput::TextInput(TextInput::new("100".into(), "Initial Height".into(), "".into())),
             rotation_input: UserInput::TextInput(TextInput::new("0".into(), "Initial Rotation".into(), " degrees".into())),
+            radii_input: UserInput::TextInput(TextInput::new("0".into(), "Initial Corner Radii".into(), "".into())),
 
             initial_width: 100.0,
             initial_height: 100.0,
             initial_rotation: Rad(0.0),
+            initial_radii: 0.0,
         }
     }
 }
@@ -47,6 +51,10 @@ impl Tool for Rect {
             self.initial_rotation = Rad(new_content.parse::<f32>().unwrap_or_default().max(0.0) * std::f32::consts::PI / 180.0);
         }
 
+        if let Some(new_content) = self.radii_input.as_text_input_mut().unwrap().poll() {
+            self.initial_radii = new_content.parse::<f32>().unwrap_or_default().max(0.0);
+        }
+
         // Handle interaction
         if let Interaction::Click {
             button: MouseButton::Left,
@@ -63,6 +71,7 @@ impl Tool for Rect {
                 self.initial_height,
                 self.initial_rotation,
                 color,
+                self.initial_radii,
             )));
 
             Capture::AllowDrag
@@ -72,7 +81,11 @@ impl Tool for Rect {
     }
 
     fn interact_options(&mut self, interaction: Interaction, app: &mut ApplicationState) -> Capture {
-        tool::interact_user_inputs(vec![&mut self.width_input, &mut self.height_input, &mut self.rotation_input], interaction, app)
+        tool::interact_user_inputs(
+            vec![&mut self.width_input, &mut self.height_input, &mut self.rotation_input, &mut self.radii_input],
+            interaction,
+            app,
+        )
     }
 
     fn render_options(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>) {
@@ -80,7 +93,7 @@ impl Tool for Rect {
             ctx,
             text_system,
             font,
-            vec![&mut self.width_input, &mut self.height_input, &mut self.rotation_input],
+            vec![&mut self.width_input, &mut self.height_input, &mut self.rotation_input, &mut self.radii_input],
         );
     }
 }

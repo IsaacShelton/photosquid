@@ -1,6 +1,5 @@
-- fix bug with right click 'revolve' operation not working on triangles
+- cw ordering for circle lerp
 - zoom in/out
-- scale as group
 - box select with pointer tool
 - select all/none (with context menu on pointer tool for empty space)
 - find way to have shortcut 'c' for "treat selection as group" and be visible to user
@@ -9,7 +8,7 @@
 - multiple layers
 - rearranging layers
 - gradients
-- beziér curves
+- bézier curves
 - paths
 - complex shapes
 - shape and/or/xor
@@ -36,4 +35,5 @@
 - arcs (and inner arc radius)
 - color palettes
 - option to not rotate objects when revolving
-- cw ordering for circle lerp
+- corner radii gadget
+- ability to base corner radii on percentage

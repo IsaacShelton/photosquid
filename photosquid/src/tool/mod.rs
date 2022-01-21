@@ -38,7 +38,7 @@ pub trait Tool {
 }
 
 pub fn get_nth_input_area(n: usize) -> AABB {
-    TextInput::standard_area(&glm::vec2(64.0, 128.0 + n as f32 * 96.0))
+    TextInput::standard_area(&glm::vec2(64.0, 128.0 + n as f32 * 80.0))
 }
 
 fn take_focus_from_user_inputs_except(user_inputs: &mut Vec<&mut UserInput>, except_i: usize) {

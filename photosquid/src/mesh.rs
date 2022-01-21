@@ -5,12 +5,26 @@ use crate::{
     render_ctx::RenderCtx,
     vertex::{Vertex, VertexXYUV},
 };
-use glium::{Display, VertexBuffer};
+use glium::{index::PrimitiveType, Display, VertexBuffer};
 use nalgebra_glm as glm;
+
+pub enum MeshIndices {
+    None(glium::index::NoIndices),
+    TrianglesU16(glium::IndexBuffer<u16>),
+}
+
+impl<'a> Into<glium::index::IndicesSource<'a>> for &'a MeshIndices {
+    fn into(self) -> glium::index::IndicesSource<'a> {
+        match self {
+            MeshIndices::None(indices) => indices.into(),
+            MeshIndices::TrianglesU16(indices) => indices.into(),
+        }
+    }
+}
 
 pub struct MeshXyz {
     pub vertex_buffer: VertexBuffer<Vertex>,
-    pub indices: glium::index::NoIndices,
+    pub indices: MeshIndices,
 }
 
 impl MeshXyz {
@@ -22,7 +36,20 @@ impl MeshXyz {
     pub fn from_vertices(vertices: &[Vertex], display: &Display) -> Self {
         let vertex_buffer = VertexBuffer::new(display, vertices).unwrap();
         let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
-        Self { vertex_buffer, indices }
+        Self {
+            vertex_buffer,
+            indices: MeshIndices::None(indices),
+        }
+    }
+
+    pub fn from_vertices_and_indices(vertices: &[Vertex], indices: &[u16], display: &Display) -> Self {
+        let vertex_buffer = VertexBuffer::new(display, vertices).unwrap();
+        let indices = glium::IndexBuffer::new(display, PrimitiveType::TrianglesList, indices).unwrap();
+
+        Self {
+            vertex_buffer,
+            indices: MeshIndices::TrianglesU16(indices),
+        }
     }
 
     pub fn new_ui_rect(display: &glium::Display) -> Self {
@@ -61,6 +88,67 @@ impl MeshXyz {
 
     pub fn new_shape_circle(display: &Display) -> Self {
         Self::new(include_str!("_src_objs/shape/circle.obj"), display)
+    }
+
+    pub fn new_rect(display: &Display, width: f32, height: f32, radii: f32) -> Self {
+        use lyon::{
+            path::{
+                builder::{BorderRadii, PathBuilder},
+                math::{point, Rect, Size},
+                Winding,
+            },
+            tessellation::{BuffersBuilder, FillOptions, FillTessellator, FillVertex, VertexBuffers},
+        };
+
+        let width = width.abs();
+        let height = height.abs();
+
+        let mut builder = lyon::path::Path::builder();
+        builder.add_rounded_rectangle(
+            &Rect::new(point(-width / 2.0, -height / 2.0), Size::new(width, height)),
+            &BorderRadii::new(radii),
+            Winding::Positive,
+        );
+        let lyon_path = builder.build();
+
+        // Will contain the result of the tessellation.
+        let mut geometry: VertexBuffers<Vertex, u16> = VertexBuffers::new();
+        let mut tessellator = FillTessellator::new();
+
+        // Create tessellated geometry for fill
+        tessellator
+            .tessellate_path(
+                &lyon_path,
+                &FillOptions::default(),
+                &mut BuffersBuilder::new(&mut geometry, |vertex: FillVertex| Vertex {
+                    position: vertex.position().to_array(),
+                }),
+            )
+            .unwrap();
+        return Self::from_vertices_and_indices(&geometry.vertices, &geometry.indices, display);
+
+        // let shape = vec![
+        //     Vertex {
+        //         position: [width * -0.5, height * -0.5],
+        //     },
+        //     Vertex {
+        //         position: [width * 0.5, height * -0.5],
+        //     },
+        //     Vertex {
+        //         position: [width * 0.5, height * 0.5],
+        //     },
+        //     Vertex {
+        //         position: [width * -0.5, height * -0.5],
+        //     },
+        //     Vertex {
+        //         position: [width * -0.5, height * 0.5],
+        //     },
+        //     Vertex {
+        //         position: [width * 0.5, height * 0.5],
+        //     },
+        // ];
+
+        // Self::from_vertices(&shape, display)
     }
 
     pub fn render(&self, ctx: &mut RenderCtx, x: f32, y: f32, w_scale: f32, h_scale: f32, color: &Color) {

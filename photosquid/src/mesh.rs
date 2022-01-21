@@ -126,29 +126,6 @@ impl MeshXyz {
             )
             .unwrap();
         return Self::from_vertices_and_indices(&geometry.vertices, &geometry.indices, display);
-
-        // let shape = vec![
-        //     Vertex {
-        //         position: [width * -0.5, height * -0.5],
-        //     },
-        //     Vertex {
-        //         position: [width * 0.5, height * -0.5],
-        //     },
-        //     Vertex {
-        //         position: [width * 0.5, height * 0.5],
-        //     },
-        //     Vertex {
-        //         position: [width * -0.5, height * -0.5],
-        //     },
-        //     Vertex {
-        //         position: [width * -0.5, height * 0.5],
-        //     },
-        //     Vertex {
-        //         position: [width * 0.5, height * 0.5],
-        //     },
-        // ];
-
-        // Self::from_vertices(&shape, display)
     }
 
     pub fn render(&self, ctx: &mut RenderCtx, x: f32, y: f32, w_scale: f32, h_scale: f32, color: &Color) {

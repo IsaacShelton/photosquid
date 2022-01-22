@@ -159,7 +159,7 @@ impl Rect {
     fn reposition_corner(&mut self, mouse: &glm::Vec2, camera: &glm::Vec2) {
         let real = self.data.get_real();
         let rotation = real.rotation.scalar();
-        let abs_size = 2.0 * glm::rotate_vec2(&(real.position.reveal() - (mouse + camera)), rotation);
+        let abs_size = 2.0 * glm::rotate_vec2(&(real.position.reveal() - (mouse - camera)), rotation);
 
         let new_size = abs_size.component_mul(&match self.moving_corner.unwrap() {
             Corner::ZeroZero => glm::vec2(1.0, 1.0),
@@ -186,8 +186,6 @@ impl Rect {
     }
 
     fn refresh_mesh(&mut self, ctx: &mut RenderCtx) {
-        // TODO: Don't refresh every frame (not trivial since radii/size animations require refreshing while active)
-
         let real_data = self.data.get_real();
         let animated_data = self.data.get_animated();
 

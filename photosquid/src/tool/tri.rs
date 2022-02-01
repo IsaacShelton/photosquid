@@ -34,10 +34,11 @@ impl Tool for Tri {
         // Handle interaction
         if let Interaction::Click {
             button: MouseButton::Left,
-            position,
+            position: click_coords,
         } = interaction
         {
-            let world_position = position - app.camera.get_animated();
+            let camera = app.camera.get_animated();
+            let world_position = camera.apply_reverse(&click_coords);
             let color = app.toolbox.color_picker.calculate_color();
 
             app.insert(Box::new(TriSquid::new(

@@ -124,6 +124,10 @@ impl ToolBox {
         self.tab_selection.external_index == 0
     }
 
+    fn is_on_layers_options(&self) -> bool {
+        self.tab_selection.external_index == 1
+    }
+
     pub fn select_tool(&mut self, index: usize) {
         if index < self.buttons.len() {
             for button in &mut self.buttons {
@@ -163,12 +167,16 @@ impl ToolBox {
             let index = self.get_options_tab_index_for_mouse(mouse, screen_width);
 
             if let Some(index) = index {
+                // Change options tab if another options tab was selected
                 self.select_tab(index);
-            } else if self.is_on_object_options() {
-                let _ = self.color_picker.click(button, mouse, screen_width);
+                return true;
             }
 
-            return true;
+            if self.is_on_object_options() {
+                // Do color picker if applicable
+                let _ = self.color_picker.click(button, mouse, screen_width);
+                return true;
+            }
         }
 
         false

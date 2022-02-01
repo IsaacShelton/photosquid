@@ -2,6 +2,7 @@ use super::{Initiation, Squid, SquidRef};
 use crate::{
     accumulator::Accumulator,
     algorithm,
+    camera::Camera,
     capture::Capture,
     color::Color,
     color_scheme::ColorScheme,
@@ -147,19 +148,17 @@ impl Rect {
             .collect()
     }
 
-    fn get_screen_corners(&self, camera: &glm::Vec2) -> Vec<glm::Vec2> {
+    fn get_screen_corners(&self, camera: &Camera) -> Vec<glm::Vec2> {
         let RectData { position, .. } = self.data.get_animated();
 
-        self.get_relative_corners()
-            .iter()
-            .map(|p| glm::vec2(p.x + position.reveal().x + camera.x, p.y + position.reveal().y + camera.y))
-            .collect()
+        self.get_relative_corners().iter().map(|p| camera.apply(&(p + position.reveal()))).collect()
     }
 
-    fn reposition_corner(&mut self, mouse: &glm::Vec2, camera: &glm::Vec2) {
+    fn reposition_corner(&mut self, mouse: &glm::Vec2, camera: &Camera) {
         let real = self.data.get_real();
         let rotation = real.rotation.scalar();
-        let abs_size = 2.0 * glm::rotate_vec2(&(real.position.reveal() - (mouse - camera)), rotation);
+        let mouse_in_world = camera.apply_reverse(mouse);
+        let abs_size = 2.0 * glm::rotate_vec2(&(real.position.reveal() - mouse_in_world), rotation);
 
         let new_size = abs_size.component_mul(&match self.moving_corner.unwrap() {
             Corner::ZeroZero => glm::vec2(1.0, 1.0),
@@ -176,13 +175,15 @@ impl Rect {
         self.mesh = None;
     }
 
-    fn get_rotate_handle_location(&self, camera: &glm::Vec2) -> glm::Vec2 {
+    fn get_rotate_handle_location(&self, camera: &Camera) -> glm::Vec2 {
         let RectData { position, w, rotation, .. } = self.data.get_animated();
 
-        glm::vec2(
-            position.reveal().x + camera.x + rotation.cos() * (w * 0.5 + 24.0 * w.signum()),
-            position.reveal().y + camera.y - rotation.sin() * (w * 0.5 + 24.0 * w.signum()),
-        )
+        let world_position = glm::vec2(
+            position.reveal().x + rotation.cos() * (w * 0.5 + 24.0 * w.signum()),
+            position.reveal().y - rotation.sin() * (w * 0.5 + 24.0 * w.signum()),
+        );
+
+        camera.apply(&world_position)
     }
 
     fn refresh_mesh(&mut self, ctx: &mut RenderCtx) {
@@ -247,19 +248,18 @@ impl Squid for Rect {
     fn render_selected_indication(&self, ctx: &mut RenderCtx) {
         let camera = ctx.camera;
         let RectData { position, .. } = self.data.get_animated();
-        let x = position.reveal().x;
-        let y = position.reveal().y;
+        let ring_position = camera.apply(&position.reveal());
 
         ctx.ring_mesh.render(
             ctx,
-            x + camera.x,
-            y + camera.y,
+            ring_position.x,
+            ring_position.y,
             squid::HANDLE_RADIUS,
             squid::HANDLE_RADIUS,
             &ctx.color_scheme.foreground,
         );
 
-        let rotate_handle = self.get_rotate_handle_location(camera);
+        let rotate_handle = self.get_rotate_handle_location(&camera);
 
         ctx.ring_mesh.render(
             ctx,
@@ -271,10 +271,12 @@ impl Squid for Rect {
         );
 
         for corner in &self.get_relative_corners() {
+            let world_corner_position = position.reveal() + corner;
+            let view_corner_position = camera.apply(&world_corner_position);
             ctx.ring_mesh.render(
                 ctx,
-                x + camera.x + corner.x,
-                y + camera.y + corner.y,
+                view_corner_position.x,
+                view_corner_position.y,
                 squid::HANDLE_RADIUS,
                 squid::HANDLE_RADIUS,
                 &ctx.color_scheme.foreground,
@@ -282,7 +284,7 @@ impl Squid for Rect {
         }
     }
 
-    fn interact(&mut self, interaction: &Interaction, camera: &glm::Vec2, _options: &InteractionOptions) -> Capture {
+    fn interact(&mut self, interaction: &Interaction, camera: &Camera, _options: &InteractionOptions) -> Capture {
         match interaction {
             Interaction::PreClick => {
                 self.translate_behavior.moving = false;
@@ -336,7 +338,9 @@ impl Squid for Rect {
                         ) + compensation,
                     };
                 } else if self.translate_behavior.moving {
-                    return Capture::MoveSelectedSquids { delta: *delta };
+                    return Capture::MoveSelectedSquids {
+                        delta_in_world: camera.apply_reverse_to_vector(delta),
+                    };
                 }
             }
             Interaction::MouseRelease { button: MouseButton::Left, .. } => {
@@ -351,8 +355,8 @@ impl Squid for Rect {
         Capture::Miss
     }
 
-    fn translate(&mut self, raw_delta: &glm::Vec2, options: &InteractionOptions) {
-        let delta = self.translate_behavior.express(raw_delta, options);
+    fn translate(&mut self, raw_delta_in_world: &glm::Vec2, options: &InteractionOptions) {
+        let delta = self.translate_behavior.express(raw_delta_in_world, options);
 
         if delta != glm::zero::<glm::Vec2>() {
             let mut new_data = *self.data.get_real();
@@ -409,19 +413,20 @@ impl Squid for Rect {
         self.mesh = None;
     }
 
-    fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool {
+    fn is_point_over(&self, underneath: &glm::Vec2, camera: &Camera) -> bool {
         let real = self.data.get_real();
+
         let corners: Vec<glm::Vec2> = self
             .get_relative_corners()
             .iter()
-            .map(|&p| glm::vec2(real.position.reveal().x + camera.x + p.x, real.position.reveal().y + camera.y + p.y))
+            .map(|&p| camera.apply(&(p + real.position.reveal())))
             .collect();
 
         assert_eq!(corners.len(), 4);
         algorithm::is_point_inside_rectangle(corners[0], corners[1], corners[2], corners[3], *underneath)
     }
 
-    fn try_select(&self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection> {
+    fn try_select(&self, underneath: &glm::Vec2, camera: &Camera, self_reference: SquidRef) -> Option<NewSelection> {
         if self.is_point_over(underneath, camera) {
             Some(NewSelection {
                 selection: Selection::new(self_reference, None),
@@ -438,7 +443,7 @@ impl Squid for Rect {
         self.translate_behavior.moving = true;
     }
 
-    fn try_context_menu(&self, underneath: &glm::Vec2, camera: &glm::Vec2, _self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu> {
+    fn try_context_menu(&self, underneath: &glm::Vec2, camera: &Camera, _self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu> {
         if self.is_point_over(underneath, camera) {
             Some(squid::common_context_menu(underneath, color_scheme))
         } else {
@@ -508,7 +513,7 @@ impl Squid for Rect {
 
     fn get_opaque_handles(&self) -> Vec<glm::Vec2> {
         let mut all_handles = self.get_world_corners();
-        all_handles.push(self.get_rotate_handle_location(&glm::zero()));
+        all_handles.push(self.get_rotate_handle_location(&Camera::default()));
         all_handles
     }
 }

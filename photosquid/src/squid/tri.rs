@@ -1,6 +1,7 @@
 use super::{Initiation, Squid, SquidRef};
 use crate::{
     accumulator::Accumulator,
+    camera::Camera,
     capture::Capture,
     color::Color,
     color_scheme::ColorScheme,
@@ -175,17 +176,17 @@ impl Tri {
         (p1 + p2 + p3) / 3.0
     }
 
-    fn get_animated_screen_points(&self, camera: &glm::Vec2) -> Vec<glm::Vec2> {
+    fn get_animated_screen_points(&self, camera: &Camera) -> Vec<glm::Vec2> {
         let TriData { p1, p2, p3, rotation, .. } = self.data.get_animated();
         let center = self.get_animated_center();
 
         [p1.reveal(), p2.reveal(), p3.reveal()]
             .iter()
-            .map(|p| glm::rotate_vec2(p, -rotation.scalar()) + center + camera)
+            .map(|p| camera.apply(&(glm::rotate_vec2(p, -rotation.scalar()) + center)))
             .collect()
     }
 
-    fn get_rotate_handle_location(&self, camera: &glm::Vec2) -> glm::Vec2 {
+    fn get_rotate_handle_location(&self, camera: &Camera) -> glm::Vec2 {
         let TriData {
             center, p1, p2, p3, rotation, ..
         } = self.data.get_animated();
@@ -197,9 +198,9 @@ impl Tri {
         let center = center.reveal();
 
         let max_distance = glm::magnitude(&p1).max(glm::magnitude(&p2)).max(glm::magnitude(&p3));
-        let first_try = center + camera + (max_distance + 24.0) * glm::vec2(rotation.cos(), -rotation.sin());
+        let first_try = center + (max_distance + 24.0) * glm::vec2(rotation.cos(), -rotation.sin());
 
-        let screen_points = self.get_animated_screen_points(camera);
+        let screen_points = self.get_animated_screen_points(&Camera::identity(camera.viewport));
         assert_eq!(screen_points.len(), 3);
 
         let r_p1 = &screen_points[0];
@@ -208,10 +209,11 @@ impl Tri {
         let true_distance = Self::get_distance_between_point_and_triangle(&first_try, r_p1, r_p2, r_p3);
         let final_distance = (max_distance + 24.0 - true_distance) + 24.0;
 
-        center + camera + final_distance * glm::vec2(rotation.cos(), -rotation.sin())
+        let rotate_handle_world_position = center + final_distance * glm::vec2(rotation.cos(), -rotation.sin());
+        camera.apply(&rotate_handle_world_position)
     }
 
-    fn reposition_point(&mut self, mouse_position: &glm::Vec2, camera: &glm::Vec2) {
+    fn reposition_point(&mut self, mouse_position: &glm::Vec2, camera: &Camera) {
         let real = self.data.get_real();
         let rotation = self.data.get_real().rotation;
         let center = self.get_real_center();
@@ -220,7 +222,8 @@ impl Tri {
         let mut p2 = glm::rotate_vec2(&real.p2.reveal(), -rotation.scalar());
         let mut p3 = glm::rotate_vec2(&real.p3.reveal(), -rotation.scalar());
 
-        let new_p = mouse_position - camera - center;
+        let mouse_world_position = camera.apply_reverse(&mouse_position);
+        let new_p = mouse_world_position - center;
 
         match self.moving_point {
             Some(0) => p1 = new_p,
@@ -389,10 +392,12 @@ impl Squid for Tri {
         let TriData { .. } = self.data.get_animated();
         let center = self.get_animated_center();
 
+        let center_in_world = camera.apply(&center);
+
         ctx.ring_mesh.render(
             ctx,
-            center.x + camera.x,
-            center.y + camera.y,
+            center_in_world.x,
+            center_in_world.y,
             squid::HANDLE_RADIUS,
             squid::HANDLE_RADIUS,
             &ctx.color_scheme.foreground,
@@ -415,7 +420,7 @@ impl Squid for Tri {
         }
     }
 
-    fn interact(&mut self, interaction: &Interaction, camera: &glm::Vec2, _options: &InteractionOptions) -> Capture {
+    fn interact(&mut self, interaction: &Interaction, camera: &Camera, _options: &InteractionOptions) -> Capture {
         match interaction {
             Interaction::PreClick => {
                 self.translate_behavior.moving = false;
@@ -462,7 +467,9 @@ impl Squid for Tri {
                         ),
                     };
                 } else if self.translate_behavior.moving {
-                    return Capture::MoveSelectedSquids { delta: *delta };
+                    return Capture::MoveSelectedSquids {
+                        delta_in_world: camera.apply_reverse_to_vector(delta),
+                    };
                 }
             }
             Interaction::MouseRelease { button: MouseButton::Left, .. } => {
@@ -476,17 +483,20 @@ impl Squid for Tri {
         Capture::Miss
     }
 
-    fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool {
+    fn is_point_over(&self, underneath: &glm::Vec2, camera: &Camera) -> bool {
         let real = self.data.get_real();
         let center = self.get_real_center();
-        let p1 = glm::rotate_vec2(&(real.p1.reveal()), -real.rotation.scalar()) + center + camera;
-        let p2 = glm::rotate_vec2(&(real.p2.reveal()), -real.rotation.scalar()) + center + camera;
-        let p3 = glm::rotate_vec2(&(real.p3.reveal()), -real.rotation.scalar()) + center + camera;
+        let p1 = glm::rotate_vec2(&(real.p1.reveal()), -real.rotation.scalar()) + center;
+        let p2 = glm::rotate_vec2(&(real.p2.reveal()), -real.rotation.scalar()) + center;
+        let p3 = glm::rotate_vec2(&(real.p3.reveal()), -real.rotation.scalar()) + center;
+        let p1 = camera.apply(&p1);
+        let p2 = camera.apply(&p2);
+        let p3 = camera.apply(&p3);
         Self::is_point_inside_triangle(underneath, &p1, &p2, &p3)
     }
 
-    fn translate(&mut self, raw_delta: &glm::Vec2, options: &InteractionOptions) {
-        let delta = self.translate_behavior.express(raw_delta, options);
+    fn translate(&mut self, raw_delta_in_world: &glm::Vec2, options: &InteractionOptions) {
+        let delta = self.translate_behavior.express(raw_delta_in_world, options);
 
         if delta != glm::zero::<glm::Vec2>() {
             let mut new_data = *self.data.get_real();
@@ -545,7 +555,7 @@ impl Squid for Tri {
         self.data.set(new_data);
     }
 
-    fn try_select(&self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection> {
+    fn try_select(&self, underneath: &glm::Vec2, camera: &Camera, self_reference: SquidRef) -> Option<NewSelection> {
         if self.is_point_over(underneath, camera) {
             Some(NewSelection {
                 selection: Selection::new(self_reference, None),
@@ -562,7 +572,7 @@ impl Squid for Tri {
         self.translate_behavior.moving = true;
     }
 
-    fn try_context_menu(&self, underneath: &glm::Vec2, camera: &glm::Vec2, _self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu> {
+    fn try_context_menu(&self, underneath: &glm::Vec2, camera: &Camera, _self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu> {
         if self.is_point_over(underneath, camera) {
             Some(squid::common_context_menu(underneath, color_scheme))
         } else {
@@ -636,7 +646,7 @@ impl Squid for Tri {
             data.p1.reveal() + center,
             data.p2.reveal() + center,
             data.p3.reveal() + center,
-            self.get_rotate_handle_location(&glm::zero()),
+            self.get_rotate_handle_location(&Camera::default()),
         ]
     }
 }

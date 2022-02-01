@@ -1,5 +1,6 @@
 use crate::{
     annotations::UnsafeTemporary,
+    camera::Camera,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
     layer::Layer,
@@ -81,9 +82,9 @@ impl Ocean {
     }
 
     // Tries to find a squid/squid-limb underneath a point to select
-    pub fn try_select(&mut self, underneath: &glm::Vec2, camera: &glm::Vec2, existing_selections: &[Selection]) -> TrySelectResult {
+    pub fn try_select(&mut self, underneath: &glm::Vec2, camera: &Camera, existing_selections: &[Selection]) -> TrySelectResult {
         let highest_squids: Vec<SquidRef> = self.get_squids_highest().collect();
-        let world_mouse = underneath - camera;
+        let world_mouse = camera.apply_reverse(&underneath);
 
         for self_reference in highest_squids {
             if let Some(squid) = self.get_mut(self_reference) {
@@ -128,7 +129,7 @@ impl Ocean {
     }
 
     // Tries to get a context menu for a squid underneath a point
-    pub fn try_context_menu(&self, underneath: &glm::Vec2, camera: &glm::Vec2, color_scheme: &ColorScheme) -> Option<ContextMenu> {
+    pub fn try_context_menu(&self, underneath: &glm::Vec2, camera: &Camera, color_scheme: &ColorScheme) -> Option<ContextMenu> {
         for self_reference in self.get_squids_highest() {
             if let Some(value) = self.get(self_reference) {
                 if let Some(new_context_menu) = value.try_context_menu(underneath, camera, self_reference, color_scheme) {

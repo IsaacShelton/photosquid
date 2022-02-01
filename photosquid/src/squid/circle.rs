@@ -1,6 +1,7 @@
 use super::{Initiation, Squid, SquidRef};
 use crate::{
     accumulator::Accumulator,
+    camera::Camera,
     capture::Capture,
     color::Color,
     color_scheme::ColorScheme,
@@ -102,7 +103,7 @@ impl Circle {
         }
     }
 
-    pub fn get_rotate_handle_location(&self, camera: &glm::Vec2) -> glm::Vec2 {
+    pub fn get_rotate_handle_location(&self, camera: &Camera) -> glm::Vec2 {
         let CircleData {
             position,
             radius,
@@ -110,12 +111,13 @@ impl Circle {
             ..
         } = self.data.get_animated();
 
-        position.reveal() + camera + radius * glm::vec2(virtual_rotation.cos(), -virtual_rotation.sin())
+        let position = position.reveal() + radius * glm::vec2(virtual_rotation.cos(), -virtual_rotation.sin());
+        camera.apply(&position)
     }
 
-    fn get_delta_rotation(&self, mouse_position: &glm::Vec2, camera: &glm::Vec2) -> Rad<f32> {
+    fn get_delta_rotation(&self, mouse_position: &glm::Vec2, camera: &Camera) -> Rad<f32> {
         let real = self.data.get_real();
-        let screen_position = real.position.reveal() + camera;
+        let screen_position = camera.apply(&real.position.reveal());
 
         let old_rotation = real.virtual_rotation + *self.rotation_accumulator.residue();
         let new_rotation = Rad(-1.0 * (mouse_position.y - screen_position.y).atan2(mouse_position.x - screen_position.x));
@@ -123,9 +125,9 @@ impl Circle {
         angle_difference(old_rotation, new_rotation)
     }
 
-    fn reposition_radius(&mut self, mouse: &glm::Vec2, camera: &glm::Vec2) {
+    fn reposition_radius(&mut self, mouse: &glm::Vec2, camera: &Camera) {
         let real_in_world = self.data.get_real();
-        let target_in_world = *mouse - camera;
+        let target_in_world = camera.apply_reverse(mouse);
 
         let mut new_data = *real_in_world;
         new_data.virtual_rotation += self.get_delta_rotation(mouse, camera);
@@ -172,16 +174,18 @@ impl Squid for Circle {
         let camera = ctx.camera;
         let CircleData { position, .. } = self.data.get_animated();
 
+        let ring_position = camera.apply(&position.reveal());
+
         ctx.ring_mesh.render(
             ctx,
-            position.reveal().x + camera.x,
-            position.reveal().y + camera.y,
+            ring_position.x,
+            ring_position.y,
             squid::HANDLE_RADIUS,
             squid::HANDLE_RADIUS,
             &ctx.color_scheme.foreground,
         );
 
-        let handle_position = self.get_rotate_handle_location(ctx.camera);
+        let handle_position = self.get_rotate_handle_location(&ctx.camera);
 
         ctx.ring_mesh.render(
             ctx,
@@ -193,7 +197,7 @@ impl Squid for Circle {
         );
     }
 
-    fn interact(&mut self, interaction: &Interaction, camera: &glm::Vec2, _options: &InteractionOptions) -> Capture {
+    fn interact(&mut self, interaction: &Interaction, camera: &Camera, _options: &InteractionOptions) -> Capture {
         match interaction {
             Interaction::PreClick => {
                 self.translate_behavior.moving = false;
@@ -219,7 +223,9 @@ impl Squid for Circle {
                     // Since rotating and scaling at same time, it doesn't apply to others
                     self.reposition_radius(current, camera);
                 } else if self.translate_behavior.moving {
-                    return Capture::MoveSelectedSquids { delta: *delta };
+                    return Capture::MoveSelectedSquids {
+                        delta_in_world: camera.apply_reverse_to_vector(delta),
+                    };
                 }
             }
             Interaction::MouseRelease { button: MouseButton::Left, .. } => {
@@ -233,8 +239,8 @@ impl Squid for Circle {
         Capture::Miss
     }
 
-    fn translate(&mut self, raw_delta: &glm::Vec2, options: &InteractionOptions) {
-        let delta = self.translate_behavior.express(raw_delta, options);
+    fn translate(&mut self, raw_delta_in_world: &glm::Vec2, options: &InteractionOptions) {
+        let delta = self.translate_behavior.express(raw_delta_in_world, options);
 
         if delta != glm::zero::<glm::Vec2>() {
             let mut new_data = *self.data.get_real();
@@ -282,13 +288,13 @@ impl Squid for Circle {
         }
     }
 
-    fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool {
+    fn is_point_over(&self, underneath: &glm::Vec2, camera: &Camera) -> bool {
         let real = self.data.get_real();
-        let position = real.position.reveal() + camera;
+        let position = camera.apply(&real.position.reveal());
         glm::distance(&position, underneath) < real.radius
     }
 
-    fn try_select(&self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection> {
+    fn try_select(&self, underneath: &glm::Vec2, camera: &Camera, self_reference: SquidRef) -> Option<NewSelection> {
         if self.is_point_over(underneath, camera) {
             Some(NewSelection {
                 selection: Selection::new(self_reference, None),
@@ -305,7 +311,7 @@ impl Squid for Circle {
         self.translate_behavior.moving = true;
     }
 
-    fn try_context_menu(&self, underneath: &glm::Vec2, camera: &glm::Vec2, _self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu> {
+    fn try_context_menu(&self, underneath: &glm::Vec2, camera: &Camera, _self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu> {
         if self.is_point_over(underneath, camera) {
             Some(squid::common_context_menu(underneath, color_scheme))
         } else {
@@ -367,6 +373,6 @@ impl Squid for Circle {
     }
 
     fn get_opaque_handles(&self) -> Vec<glm::Vec2> {
-        vec![self.get_rotate_handle_location(&glm::zero())]
+        vec![self.get_rotate_handle_location(&Camera::default())]
     }
 }

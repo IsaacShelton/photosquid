@@ -61,7 +61,7 @@ impl Tool for Rect {
             position,
         } = interaction
         {
-            let world_position = position - app.camera.get_animated();
+            let world_position = app.camera.get_animated().apply_reverse(&position);
             let color = app.toolbox.color_picker.calculate_color();
 
             app.insert(Box::new(RectSquid::new(

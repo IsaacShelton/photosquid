@@ -35,7 +35,7 @@ impl Tool for Circle {
             position,
         } = interaction
         {
-            let world_position = position - app.camera.get_animated();
+            let world_position = app.camera.get_animated().apply_reverse(&position);
             let color = app.toolbox.color_picker.calculate_color();
 
             app.insert(Box::new(CircleSquid::new(world_position.x, world_position.y, self.initial_radius, color)));

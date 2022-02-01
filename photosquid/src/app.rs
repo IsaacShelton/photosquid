@@ -1,4 +1,5 @@
 use crate::{
+    camera::Camera,
     capture::Capture,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
@@ -49,7 +50,7 @@ pub struct ApplicationState {
     pub projection: Option<glm::Mat4>,
     pub view: Option<glm::Mat4>,
     pub frame_start_time: Instant,
-    pub camera: Smooth<glm::Vec2>,
+    pub camera: Smooth<Camera>,
     pub dragging: Option<Dragging>,
     pub selections: Vec<Selection>,
     pub keys_held: BTreeSet<VirtualKeyCode>,
@@ -105,12 +106,24 @@ impl ApplicationState {
     }
 
     pub fn press_key(&mut self, key: VirtualKeyCode, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>) {
+        use crate::camera::EasySmoothCamera;
+
         if self.modifiers_held.control_or_command() && key == VirtualKeyCode::Z {
             if self.modifiers_held.shift() {
                 self.redo();
             } else {
                 self.undo();
             }
+            return;
+        }
+
+        if self.modifiers_held.control_or_command() && key == VirtualKeyCode::Equals {
+            self.camera.increase_zoom();
+            return;
+        }
+
+        if self.modifiers_held.control_or_command() && key == VirtualKeyCode::Minus {
+            self.camera.decrease_zoom();
             return;
         }
 
@@ -151,17 +164,17 @@ impl ApplicationState {
         self.display.gl_window().window().set_cursor_icon(cursor);
     }
 
-    pub fn handle_captured(&mut self, capture: &Capture) {
+    pub fn handle_captured(&mut self, capture: &Capture, camera: &Camera) {
         match capture {
             Capture::Miss => (),
             Capture::AllowDrag => (),
             Capture::NoDrag => (),
             Capture::TakeFocus => (),
             Capture::Keyboard(..) => (),
-            Capture::MoveSelectedSquids { delta } => {
+            Capture::MoveSelectedSquids { delta_in_world } => {
                 for squid_id in self.get_selected_squids() {
                     if let Some(squid) = self.ocean.get_mut(squid_id) {
-                        squid.translate(delta, &self.interaction_options);
+                        squid.translate(delta_in_world, &self.interaction_options);
                     }
                 }
             }
@@ -238,20 +251,16 @@ impl ApplicationState {
         match initiation {
             Initiation::Translate { .. } => (),
             Initiation::Rotate => {
-                let mouse = self.mouse_position.unwrap();
-                let camera = self.camera.get_animated();
-                let position = glm::vec2(mouse.x, mouse.y) - camera;
+                let position = self.get_mouse_in_world_space();
 
                 if let Some(rotate_point) = self.get_closest_selection_center(&position) {
-                    let point = rotate_point + camera;
+                    let point = self.camera.get_animated().apply(&rotate_point);
                     let rotation = Rad((rotate_point.y - position.y).atan2(position.x - rotate_point.x)) - Rad::pi_over_2();
                     self.operation = Some(Operation::Rotate { point, rotation });
                 }
             }
             Initiation::Scale => {
-                let mouse = self.mouse_position.unwrap();
-                let camera = self.camera.get_animated();
-                let point = glm::vec2(mouse.x, mouse.y) - camera;
+                let point = self.get_mouse_in_world_space();
 
                 if let Some(origin) = self.get_closest_selection_center(&point) {
                     self.operation = Some(Operation::Scale { point, origin });
@@ -338,6 +347,6 @@ impl ApplicationState {
     pub fn get_mouse_in_world_space(&self) -> glm::Vec2 {
         let mouse = self.mouse_position.unwrap();
         let camera = self.camera.get_animated();
-        glm::vec2(mouse.x, mouse.y) - camera
+        camera.apply_reverse(&glm::vec2(mouse.x, mouse.y))
     }
 }

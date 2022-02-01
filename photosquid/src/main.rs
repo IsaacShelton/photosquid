@@ -13,6 +13,7 @@ mod algorithm;
 mod annotations;
 mod app;
 mod bool_poll;
+mod camera;
 mod capture;
 mod checkbox;
 mod color;
@@ -50,6 +51,7 @@ mod vertex;
 const TARGET_FPS: u64 = 60;
 
 use app::{ApplicationState, MULTISAMPLING_COUNT};
+use camera::Camera;
 use capture::Capture;
 use color_scheme::ColorScheme;
 use context_menu::ContextAction;
@@ -143,7 +145,7 @@ fn main() {
         projection: None,
         view: None,
         frame_start_time: Instant::now(),
-        camera: Smooth::new(glm::vec2(0.0, 0.0), Duration::from_millis(500)),
+        camera: Smooth::new(Camera::default(), Duration::from_millis(500)),
         dragging: None,
         selections: vec![],
         keys_held: BTreeSet::new(),
@@ -161,10 +163,12 @@ fn main() {
         let framebuffer_dimensions = app.display.get_framebuffer_dimensions();
 
         app.frame_start_time = Instant::now();
-        app.dimensions = Some((
-            framebuffer_dimensions.0 as f32 / app.scale_factor as f32,
-            framebuffer_dimensions.1 as f32 / app.scale_factor as f32,
-        ));
+
+        let view_width = framebuffer_dimensions.0 as f32 / app.scale_factor as f32;
+        let view_height = framebuffer_dimensions.1 as f32 / app.scale_factor as f32;
+        app.dimensions = Some((view_width, view_height));
+
+        app.camera.manual_get_real().viewport = glm::vec2(view_width, view_height);
 
         // Handle user input
         if let Some(new_control_flow) = on_event(abstract_event, &mut app, &mut tools, &mut options_tabs) {
@@ -244,7 +248,7 @@ fn redraw(
 
     // Setup matrices
     app.projection = Some(glm::ortho(0.0, width, height, 0.0, 100.0, -100.0));
-    app.view = Some(glm::translation(&glm::vec2_to_vec3(&app.camera.get_animated())));
+    app.view = Some(app.camera.get_animated().mat());
 
     // Create target
     let mut target = app.display.draw();
@@ -501,7 +505,7 @@ fn on_mouse_input(app: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<d
             Capture::NoDrag => (),
             capture => {
                 app.dragging = Some(Dragging::new(app.mouse_position.unwrap_or_default()));
-                app.handle_captured(&capture);
+                app.handle_captured(&capture, &app.camera.get_animated());
             }
         }
     } else {
@@ -521,6 +525,6 @@ fn on_mouse_move(app: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dy
         dragging.update(glm::vec2(logical_position.x, logical_position.y));
 
         let capture = do_drag(app, tools);
-        app.handle_captured(&capture);
+        app.handle_captured(&capture, &app.camera.get_animated());
     }
 }

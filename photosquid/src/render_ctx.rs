@@ -1,4 +1,5 @@
 use crate::{
+    camera::Camera,
     color::Color,
     color_impls::Clearable,
     color_scheme::ColorScheme,
@@ -25,7 +26,7 @@ pub struct RenderCtx<'a, 'f> {
     pub check_mesh: &'a MeshXyz,
     pub square_xyzuv: &'a MeshXyzUv,
     pub color_scheme: &'a ColorScheme,
-    pub camera: &'a glm::Vec2,
+    pub camera: &'a Camera,
     pub display: &'a Display,
 }
 

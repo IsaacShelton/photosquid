@@ -1,5 +1,5 @@
 use super::{Capture, Interaction, Tool};
-use crate::{app::ApplicationState, render_ctx::RenderCtx, text_input::TextInput, tool, user_input::UserInput};
+use crate::{app::ApplicationState, camera::EasySmoothCamera, render_ctx::RenderCtx, text_input::TextInput, tool, user_input::UserInput};
 use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;
 use std::rc::Rc;
@@ -20,15 +20,15 @@ impl Pan {
     fn poll_inputs(&mut self, app: &mut ApplicationState) {
         // Update options
         if let Some(new_content) = self.x_input.as_text_input_mut().unwrap().poll() {
-            let real_camera_position = *app.camera.get_real();
+            let real_camera_position = app.camera.get_real().location;
             let new_x = -new_content.parse::<f32>().unwrap_or_default();
-            app.camera.set(glm::vec2(new_x, real_camera_position.y));
+            app.camera.set_location(glm::vec2(new_x, real_camera_position.y));
         }
 
         if let Some(new_content) = self.y_input.as_text_input_mut().unwrap().poll() {
             let real_camera_position = *app.camera.get_real();
             let new_y = -new_content.parse::<f32>().unwrap_or_default();
-            app.camera.set(glm::vec2(real_camera_position.x, new_y));
+            app.camera.set_location(glm::vec2(real_camera_position.location.x, new_y));
         }
     }
 
@@ -45,17 +45,27 @@ impl Tool for Pan {
     fn interact(&mut self, interaction: Interaction, app: &mut ApplicationState) -> Capture {
         match interaction {
             Interaction::Drag { delta, .. } => {
-                app.camera.set(glm::round(&(app.camera.get_real() + delta)));
+                // Get the "real" camera, which is unaffected by animation
+                let real_camera = app.camera.get_real();
 
+                // Apply reverse camera transformation to the drag vector in order to
+                // bring it into world space and then add it to the real camera position
+                // to get the new camera location
+                let new_camera_location = glm::round(&(real_camera.location + real_camera.apply_reverse_to_vector(&delta)));
+
+                // Apply drag
+                app.camera.set_location(new_camera_location);
+
+                // Update UI inputs
                 let x_input = self.x_input.as_text_input_mut().unwrap();
                 let y_input = self.y_input.as_text_input_mut().unwrap();
 
                 if !x_input.is_focused() {
-                    x_input.set(&Self::camera_coord_to_string(app.camera.get_real().x));
+                    x_input.set(&Self::camera_coord_to_string(new_camera_location.x));
                 }
 
                 if !y_input.is_focused() {
-                    y_input.set(&Self::camera_coord_to_string(app.camera.get_real().y));
+                    y_input.set(&Self::camera_coord_to_string(new_camera_location.y));
                 }
 
                 Capture::AllowDrag

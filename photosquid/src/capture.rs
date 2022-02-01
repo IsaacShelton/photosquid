@@ -9,7 +9,7 @@ pub enum Capture {
     NoDrag,
     TakeFocus,
     Keyboard(KeyCapture),
-    MoveSelectedSquids { delta: glm::Vec2 },
+    MoveSelectedSquids { delta_in_world: glm::Vec2 },
     RotateSelectedSquids { delta_theta: Rad<f32> },
     ScaleSelectedSquids { total_scale_factor: f32 },
     SpreadSelectedSquids { current: glm::Vec2 },

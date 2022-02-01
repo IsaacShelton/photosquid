@@ -4,6 +4,7 @@ pub mod rect;
 pub mod tri;
 
 use crate::{
+    camera::Camera,
     capture::Capture,
     color::Color,
     color_scheme::ColorScheme,
@@ -42,10 +43,10 @@ pub trait Squid {
     // Called when squid is selected and has opportunity to capture
     // user interaction
     // Returns if and how the interaction was captured
-    fn interact(&mut self, interaction: &Interaction, camera: &glm::Vec2, options: &InteractionOptions) -> Capture;
+    fn interact(&mut self, interaction: &Interaction, camera: &Camera, options: &InteractionOptions) -> Capture;
 
     // Returns whether a point is over this squid
-    fn is_point_over(&self, underneath: &glm::Vec2, camera: &glm::Vec2) -> bool;
+    fn is_point_over(&self, underneath: &glm::Vec2, camera: &Camera) -> bool;
 
     // Moves a squid body
     fn translate(&mut self, delta: &glm::Vec2, options: &InteractionOptions);
@@ -67,13 +68,13 @@ pub trait Squid {
 
     // Attempts to get a selection for this squid or a selection for a limb of this squid
     // under the point (x, y)
-    fn try_select(&self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef) -> Option<NewSelection>;
+    fn try_select(&self, underneath: &glm::Vec2, camera: &Camera, self_reference: SquidRef) -> Option<NewSelection>;
 
     // Performs selection
     fn select(&mut self);
 
     // Attempt to get a context menu for if a quid is underneath a point
-    fn try_context_menu(&self, underneath: &glm::Vec2, camera: &glm::Vec2, self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu>;
+    fn try_context_menu(&self, underneath: &glm::Vec2, camera: &Camera, self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu>;
 
     // Attempts to set the color of a squid
     fn set_color(&mut self, color: Color);

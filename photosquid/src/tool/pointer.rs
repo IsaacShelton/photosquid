@@ -129,7 +129,8 @@ impl Pointer {
             }
             Some(Operation::Scale { origin, point }) => {
                 let d0 = glm::distance(origin, point);
-                let df = glm::distance(origin, &(mouse_position - app.camera.get_animated()));
+                let world_position = app.camera.get_animated().apply_reverse(&mouse_position);
+                let df = glm::distance(origin, &world_position);
                 let total_scale_factor = df / d0;
                 Capture::ScaleSelectedSquids { total_scale_factor }
             }

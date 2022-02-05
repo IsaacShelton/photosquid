@@ -1,4 +1,4 @@
-use crate::interaction::Interaction;
+use crate::interaction::{DragInteraction, Interaction};
 use glium::glutin::dpi::LogicalPosition;
 use nalgebra_glm as glm;
 
@@ -29,10 +29,10 @@ impl Dragging {
     }
 
     pub fn to_interaction(&self) -> Interaction {
-        Interaction::Drag {
+        Interaction::Drag(DragInteraction {
             delta: self.get_delta(),
             start: self.down,
             current: self.current,
-        }
+        })
     }
 }

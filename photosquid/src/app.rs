@@ -5,7 +5,7 @@ use crate::{
     context_menu::ContextMenu,
     dragging::Dragging,
     history::History,
-    interaction::Interaction,
+    interaction::{Interaction, KeyInteraction},
     interaction_options::InteractionOptions,
     mesh::{MeshXyz, MeshXyzUv},
     ocean::Ocean,
@@ -46,7 +46,7 @@ pub struct ApplicationState {
     pub scale_factor: f64,
     pub ocean: Ocean,
     pub history: History,
-    pub dimensions: Option<(f32, f32)>,
+    pub dimensions: glm::Vec2,
     pub projection: Option<glm::Mat4>,
     pub view: Option<glm::Mat4>,
     pub frame_start_time: Instant,
@@ -105,6 +105,26 @@ impl ApplicationState {
         Capture::Miss
     }
 
+    pub fn scroll(&mut self, delta: &glm::Vec2) {
+        let range = 1000.0;
+
+        let zoom = match delta.y {
+            x if x < 0.0 => 1.0 / (1.0 + -x / range),
+            x if x > 0.0 => 1.0 + x / range,
+            _ => return,
+        };
+
+        let mouse_position = self.mouse_position.unwrap();
+        let mouse_position = glm::vec2(mouse_position.x, mouse_position.y);
+        let ratios = mouse_position.component_div(&self.camera.get_real().window);
+        let view = self.camera.get_real().to_view();
+        let view_size = view.1 - view.0;
+        let center = view.0 + ratios.component_mul(&view_size);
+
+        use crate::camera::EasySmoothCamera;
+        self.camera.zoom_point(zoom, &center);
+    }
+
     pub fn press_key(&mut self, key: VirtualKeyCode, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>) {
         use crate::camera::EasySmoothCamera;
 
@@ -128,11 +148,13 @@ impl ApplicationState {
         }
 
         if let Some(tool_key) = self.toolbox.get_selected() {
-            if tools[tool_key].interact(Interaction::Key { virtual_keycode: key }, self) != Capture::Miss {
+            let interaction = Interaction::Key(KeyInteraction { virtual_keycode: key });
+
+            if tools[tool_key].interact(interaction, self) != Capture::Miss {
                 return;
             }
 
-            if tools[tool_key].interact_options(Interaction::Key { virtual_keycode: key }, self) != Capture::Miss {
+            if tools[tool_key].interact_options(interaction, self) != Capture::Miss {
                 return;
             }
         }
@@ -164,7 +186,9 @@ impl ApplicationState {
         self.display.gl_window().window().set_cursor_icon(cursor);
     }
 
-    pub fn handle_captured(&mut self, capture: &Capture, camera: &Camera) {
+    pub fn handle_captured(&mut self, capture: &Capture, _camera: &Camera) {
+        // TODO: Fix collective operations when camera is zoomed in/out and not at (0, 0)
+
         match capture {
             Capture::Miss => (),
             Capture::AllowDrag => (),

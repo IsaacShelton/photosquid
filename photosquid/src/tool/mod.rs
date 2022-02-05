@@ -8,7 +8,7 @@ use crate::{
     aabb::AABB,
     app::ApplicationState,
     capture::{Capture, KeyCapture},
-    interaction::Interaction,
+    interaction::{ClickInteraction, Interaction, KeyInteraction},
     render_ctx::RenderCtx,
     text_input::TextInput,
     user_input::UserInput,
@@ -49,48 +49,54 @@ fn take_focus_from_user_inputs_except(user_inputs: &mut Vec<&mut UserInput>, exc
     }
 }
 
+fn click_user_inputs(user_inputs: &mut Vec<&mut UserInput>, click_interaction: ClickInteraction) -> Capture {
+    let mut capture: Option<Capture> = None;
+    let mut from_i = 0;
+
+    for (i, user_input) in user_inputs.iter_mut().enumerate() {
+        let area = get_nth_input_area(i);
+        let click_capture = user_input.click(click_interaction.button, &click_interaction.position, &area);
+
+        if click_capture == Capture::TakeFocus {
+            from_i = i;
+            capture = Some(click_capture);
+            break;
+        }
+    }
+
+    if let Some(capture) = capture {
+        if let Capture::TakeFocus = capture {
+            take_focus_from_user_inputs_except(user_inputs, from_i);
+        }
+        capture?;
+    }
+
+    Capture::Miss
+}
+
+fn key_user_inputs(user_inputs: &mut Vec<&mut UserInput>, key_interaction: KeyInteraction, app: &mut ApplicationState) -> Capture {
+    let shift = app.keys_held.contains(&VirtualKeyCode::LShift);
+
+    for user_input in user_inputs {
+        let key_capture = user_input.key_press(key_interaction.virtual_keycode, shift);
+
+        if key_capture != KeyCapture::Miss {
+            return Capture::Keyboard(key_capture);
+        }
+    }
+
+    Capture::Miss
+}
+
 pub fn interact_user_inputs(user_inputs: Vec<&mut UserInput>, interaction: Interaction, app: &mut ApplicationState) -> Capture {
+    // Allow 'user_inputs' parameter to be mutable (it is a copy anyways)
     let mut user_inputs = user_inputs;
 
     match interaction {
-        Interaction::Click { button, position } => {
-            let mut capture: Option<Capture> = None;
-            let mut from_i = 0;
-
-            for (i, user_input) in user_inputs.iter_mut().enumerate() {
-                let area = get_nth_input_area(i);
-                let click_capture = user_input.click(button, &position, &area);
-
-                if click_capture == Capture::TakeFocus {
-                    from_i = i;
-                    capture = Some(click_capture);
-                }
-
-                if capture.is_some() {
-                    break;
-                }
-            }
-
-            if let Some(capture) = capture {
-                if let Capture::TakeFocus = capture {
-                    take_focus_from_user_inputs_except(&mut user_inputs, from_i);
-                }
-                capture?;
-            }
-        }
-        Interaction::Key { virtual_keycode } => {
-            let shift = app.keys_held.contains(&VirtualKeyCode::LShift);
-
-            for user_input in user_inputs.drain(0..) {
-                let key_capture = user_input.key_press(virtual_keycode, shift);
-                if key_capture != KeyCapture::Miss {
-                    return Capture::Keyboard(key_capture);
-                }
-            }
-        }
-        _ => (),
+        Interaction::Click(click_interaction) => click_user_inputs(&mut user_inputs, click_interaction),
+        Interaction::Key(key_interaction) => key_user_inputs(&mut user_inputs, key_interaction, app),
+        _ => Capture::Miss,
     }
-    Capture::Miss
 }
 
 pub fn render_user_inputs(ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>, user_inputs: Vec<&mut UserInput>) {

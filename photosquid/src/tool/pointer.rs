@@ -2,6 +2,7 @@ use super::{Capture, Interaction, KeyCapture, Tool};
 use crate::{
     app::ApplicationState,
     bool_poll,
+    interaction::{ClickInteraction, DragInteraction, KeyInteraction},
     operation::Operation,
     render_ctx::RenderCtx,
     selection::{NewSelection, TrySelectResult},
@@ -142,7 +143,7 @@ impl Pointer {
     }
 
     fn dispatch_key(app: &mut ApplicationState, virtual_keycode: VirtualKeyCode) -> Capture {
-        app.try_interact_with_selections(&Interaction::Key { virtual_keycode })?;
+        app.try_interact_with_selections(&Interaction::Key(KeyInteraction { virtual_keycode }))?;
         Self::handle_hotkey(app, virtual_keycode)
     }
 
@@ -162,7 +163,7 @@ impl Tool for Pointer {
         self.poll_options(app);
 
         match interaction {
-            Interaction::Click { button, position, .. } => {
+            Interaction::Click(ClickInteraction { button, position, .. }) => {
                 app.preclick();
 
                 let possible_selection = self.try_select(&position, app);
@@ -179,12 +180,12 @@ impl Tool for Pointer {
 
                 Capture::AllowDrag
             }
-            Interaction::Drag { current: mouse_position, .. } => {
+            Interaction::Drag(DragInteraction { current: mouse_position, .. }) => {
                 Self::dispatch_drag(app, &mouse_position)?;
                 app.try_interact_with_selections(&interaction)?;
                 Capture::AllowDrag
             }
-            Interaction::Key { virtual_keycode } => Self::dispatch_key(app, virtual_keycode),
+            Interaction::Key(KeyInteraction { virtual_keycode }) => Self::dispatch_key(app, virtual_keycode),
             _ => {
                 app.try_interact_with_selections(&interaction)?;
                 Capture::AllowDrag
@@ -197,7 +198,7 @@ impl Tool for Pointer {
 
         tool::interact_user_inputs(vec![&mut self.translation_snapping_input, &mut self.rotation_snapping_input], interaction, app)?;
 
-        if let Interaction::Key { virtual_keycode: Escape } = interaction {
+        if let Interaction::Key(KeyInteraction { virtual_keycode: Escape }) = interaction {
             app.selections.clear();
             Capture::Keyboard(KeyCapture::Capture)
         } else {

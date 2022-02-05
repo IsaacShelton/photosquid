@@ -1,4 +1,12 @@
-use crate::{aabb::AABB, capture::Capture, color::Color, interaction::Interaction, matrix_helpers::reach_inside_mat4, render_ctx::RenderCtx, smooth::Smooth};
+use crate::{
+    aabb::AABB,
+    capture::Capture,
+    color::Color,
+    interaction::{DragInteraction, Interaction},
+    matrix_helpers::reach_inside_mat4,
+    render_ctx::RenderCtx,
+    smooth::Smooth,
+};
 use glium::glutin::event::MouseButton;
 use nalgebra_glm as glm;
 use std::time::Duration;
@@ -56,15 +64,17 @@ impl ColorPicker {
     }
 
     pub fn drag(&mut self, interaction: &Interaction, screen_width: f32) -> Capture {
-        if let Interaction::Drag { current, .. } = interaction {
-            if self.is_selecting_hue_value {
-                self.set_hue_value_with_mouse(current, screen_width);
-            } else if self.is_selecting_saturation {
-                self.set_saturation_with_mouse(current, screen_width);
+        match interaction {
+            Interaction::Drag(DragInteraction { current, .. }) => {
+                if self.is_selecting_hue_value {
+                    self.set_hue_value_with_mouse(current, screen_width);
+                } else if self.is_selecting_saturation {
+                    self.set_saturation_with_mouse(current, screen_width);
+                }
+                Capture::AllowDrag
             }
-            return Capture::AllowDrag;
+            _ => Capture::Miss,
         }
-        Capture::Miss
     }
 
     pub fn mouse_release(&mut self, button: MouseButton) {

@@ -7,7 +7,7 @@ use crate::{
     color::Color,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
-    interaction::Interaction,
+    interaction::{ClickInteraction, DragInteraction, Interaction, MouseReleaseInteraction},
     interaction_options::InteractionOptions,
     math_helpers::DivOrZero,
     matrix_helpers::reach_inside_mat4,
@@ -291,10 +291,10 @@ impl Squid for Rect {
                 self.rotating = false;
                 self.moving_corner = None;
             }
-            Interaction::Click {
+            Interaction::Click(ClickInteraction {
                 button: MouseButton::Left,
                 position,
-            } => {
+            }) => {
                 for (i, corner) in self.get_screen_corners(camera).iter().enumerate() {
                     if glm::distance(position, corner) <= squid::HANDLE_RADIUS * 2.0 {
                         self.moving_corner = Some(Self::get_corner_kind(i));
@@ -313,11 +313,11 @@ impl Squid for Rect {
                     return Capture::AllowDrag;
                 }
             }
-            Interaction::Drag {
+            Interaction::Drag(DragInteraction {
                 delta,
                 current: mouse_position,
                 ..
-            } => {
+            }) => {
                 if self.moving_corner.is_some() {
                     self.reposition_corner(mouse_position, camera);
                 } else if self.rotating {
@@ -343,7 +343,7 @@ impl Squid for Rect {
                     };
                 }
             }
-            Interaction::MouseRelease { button: MouseButton::Left, .. } => {
+            Interaction::MouseRelease(MouseReleaseInteraction { button: MouseButton::Left, .. }) => {
                 self.rotating = false;
                 self.moving_corner = None;
                 self.translate_behavior.accumulator.clear();
@@ -513,7 +513,7 @@ impl Squid for Rect {
 
     fn get_opaque_handles(&self) -> Vec<glm::Vec2> {
         let mut all_handles = self.get_world_corners();
-        all_handles.push(self.get_rotate_handle_location(&Camera::default()));
+        all_handles.push(self.get_rotate_handle_location(&Camera::identity(glm::zero())));
         all_handles
     }
 }

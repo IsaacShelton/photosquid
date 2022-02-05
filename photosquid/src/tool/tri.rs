@@ -1,5 +1,12 @@
 use crate::{
-    app::ApplicationState, capture::Capture, interaction::Interaction, render_ctx::RenderCtx, squid::Tri as TriSquid, text_input::TextInput, tool, tool::Tool,
+    app::ApplicationState,
+    capture::Capture,
+    interaction::{ClickInteraction, Interaction},
+    render_ctx::RenderCtx,
+    squid::Tri as TriSquid,
+    text_input::TextInput,
+    tool,
+    tool::Tool,
     user_input::UserInput,
 };
 use angular_units::Rad;
@@ -32,10 +39,10 @@ impl Tool for Tri {
         }
 
         // Handle interaction
-        if let Interaction::Click {
+        if let Interaction::Click(ClickInteraction {
             button: MouseButton::Left,
             position: click_coords,
-        } = interaction
+        }) = interaction
         {
             let camera = app.camera.get_animated();
             let world_position = camera.apply_reverse(&click_coords);

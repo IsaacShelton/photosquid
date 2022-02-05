@@ -1,6 +1,13 @@
 use crate::{
-    app::ApplicationState, capture::Capture, interaction::Interaction, render_ctx::RenderCtx, squid::Rect as RectSquid, text_input::TextInput, tool,
-    tool::Tool, user_input::UserInput,
+    app::ApplicationState,
+    capture::Capture,
+    interaction::{ClickInteraction, Interaction},
+    render_ctx::RenderCtx,
+    squid::Rect as RectSquid,
+    text_input::TextInput,
+    tool,
+    tool::Tool,
+    user_input::UserInput,
 };
 use angular_units::Rad;
 use glium::glutin::event::MouseButton;
@@ -56,10 +63,10 @@ impl Tool for Rect {
         }
 
         // Handle interaction
-        if let Interaction::Click {
+        if let Interaction::Click(ClickInteraction {
             button: MouseButton::Left,
             position,
-        } = interaction
+        }) = interaction
         {
             let world_position = app.camera.get_animated().apply_reverse(&position);
             let color = app.toolbox.color_picker.calculate_color();

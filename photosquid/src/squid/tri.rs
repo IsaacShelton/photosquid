@@ -6,7 +6,7 @@ use crate::{
     color::Color,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
-    interaction::Interaction,
+    interaction::{ClickInteraction, DragInteraction, Interaction, MouseReleaseInteraction},
     interaction_options::InteractionOptions,
     math_helpers::DivOrZero,
     matrix_helpers::reach_inside_mat4,
@@ -200,7 +200,7 @@ impl Tri {
         let max_distance = glm::magnitude(&p1).max(glm::magnitude(&p2)).max(glm::magnitude(&p3));
         let first_try = center + (max_distance + 24.0) * glm::vec2(rotation.cos(), -rotation.sin());
 
-        let screen_points = self.get_animated_screen_points(&Camera::identity(camera.viewport));
+        let screen_points = self.get_animated_screen_points(&Camera::identity(camera.window));
         assert_eq!(screen_points.len(), 3);
 
         let r_p1 = &screen_points[0];
@@ -427,10 +427,10 @@ impl Squid for Tri {
                 self.rotating = false;
                 self.moving_point = None;
             }
-            Interaction::Click {
+            Interaction::Click(ClickInteraction {
                 button: MouseButton::Left,
                 position,
-            } => {
+            }) => {
                 for (i, corner) in self.get_animated_screen_points(camera).iter().enumerate() {
                     if glm::distance(position, corner) <= squid::HANDLE_RADIUS * 2.0 {
                         self.moving_point = Some(i);
@@ -449,11 +449,11 @@ impl Squid for Tri {
                     return Capture::AllowDrag;
                 }
             }
-            Interaction::Drag {
+            Interaction::Drag(DragInteraction {
                 delta,
                 current: mouse_position,
                 ..
-            } => {
+            }) => {
                 if self.moving_point.is_some() {
                     self.reposition_point(mouse_position, camera);
                 } else if self.rotating {
@@ -472,7 +472,7 @@ impl Squid for Tri {
                     };
                 }
             }
-            Interaction::MouseRelease { button: MouseButton::Left, .. } => {
+            Interaction::MouseRelease(MouseReleaseInteraction { button: MouseButton::Left, .. }) => {
                 self.rotating = false;
                 self.moving_point = None;
                 self.translate_behavior.accumulator.clear();
@@ -646,7 +646,7 @@ impl Squid for Tri {
             data.p1.reveal() + center,
             data.p2.reveal() + center,
             data.p3.reveal() + center,
-            self.get_rotate_handle_location(&Camera::default()),
+            self.get_rotate_handle_location(&Camera::identity(glm::zero())),
         ]
     }
 }

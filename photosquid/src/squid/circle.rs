@@ -6,7 +6,7 @@ use crate::{
     color::Color,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
-    interaction::Interaction,
+    interaction::{ClickInteraction, DragInteraction, Interaction, MouseReleaseInteraction},
     interaction_options::InteractionOptions,
     math_helpers::angle_difference,
     matrix_helpers::reach_inside_mat4,
@@ -203,10 +203,10 @@ impl Squid for Circle {
                 self.translate_behavior.moving = false;
                 self.scale_rotating = false;
             }
-            Interaction::Click {
+            Interaction::Click(ClickInteraction {
                 button: MouseButton::Left,
                 position,
-            } => {
+            }) => {
                 let rotate_handle_location = self.get_rotate_handle_location(camera);
                 if glm::distance(position, &rotate_handle_location) <= squid::HANDLE_RADIUS * 3.0 {
                     self.scale_rotating = true;
@@ -218,7 +218,7 @@ impl Squid for Circle {
                     return Capture::AllowDrag;
                 }
             }
-            Interaction::Drag { current, delta, .. } => {
+            Interaction::Drag(DragInteraction { current, delta, .. }) => {
                 if self.scale_rotating {
                     // Since rotating and scaling at same time, it doesn't apply to others
                     self.reposition_radius(current, camera);
@@ -228,7 +228,7 @@ impl Squid for Circle {
                     };
                 }
             }
-            Interaction::MouseRelease { button: MouseButton::Left, .. } => {
+            Interaction::MouseRelease(MouseReleaseInteraction { button: MouseButton::Left, .. }) => {
                 self.scale_rotating = false;
                 self.translate_behavior.accumulator.clear();
                 self.rotation_accumulator.clear();
@@ -290,8 +290,8 @@ impl Squid for Circle {
 
     fn is_point_over(&self, underneath: &glm::Vec2, camera: &Camera) -> bool {
         let real = self.data.get_real();
-        let position = camera.apply(&real.position.reveal());
-        glm::distance(&position, underneath) < real.radius
+        let underneath_in_world = camera.apply_reverse(&underneath);
+        glm::distance(&real.position.reveal(), &underneath_in_world) < real.radius
     }
 
     fn try_select(&self, underneath: &glm::Vec2, camera: &Camera, self_reference: SquidRef) -> Option<NewSelection> {
@@ -373,6 +373,6 @@ impl Squid for Circle {
     }
 
     fn get_opaque_handles(&self) -> Vec<glm::Vec2> {
-        vec![self.get_rotate_handle_location(&Camera::default())]
+        vec![self.get_rotate_handle_location(&Camera::identity(glm::zero()))]
     }
 }

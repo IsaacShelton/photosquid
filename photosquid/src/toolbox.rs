@@ -1,7 +1,7 @@
 use crate::{
     capture::Capture,
     color::Color,
-    interaction::Interaction,
+    interaction::{ClickInteraction, DragInteraction, Interaction},
     matrix_helpers::reach_inside_mat4,
     mesh::MeshXyz,
     ocean::Ocean,
@@ -124,10 +124,6 @@ impl ToolBox {
         self.tab_selection.external_index == 0
     }
 
-    fn is_on_layers_options(&self) -> bool {
-        self.tab_selection.external_index == 1
-    }
-
     pub fn select_tool(&mut self, index: usize) {
         if index < self.buttons.len() {
             for button in &mut self.buttons {
@@ -150,36 +146,35 @@ impl ToolBox {
         }
     }
 
-    pub fn click(&mut self, button: MouseButton, mouse: &glm::Vec2, screen_width: f32, screen_height: f32) -> bool {
+    pub fn click(&mut self, interaction: Interaction, screen_width: f32, screen_height: f32) -> Capture {
+        let ClickInteraction { button, position: mouse } = interaction.as_click().unwrap();
+
         // Tool ribbon
-        if button == MouseButton::Left && mouse.x < self.width {
+        if *button == MouseButton::Left && mouse.x < self.width {
             let index = self.get_index_for_mouse_y(mouse.y, screen_height);
 
             if let Some(index) = index {
                 self.select_tool(index);
             }
 
-            return true;
+            return Capture::AllowDrag;
         }
 
-        // Squid options ribbon
-        if button == MouseButton::Left && mouse.x > screen_width - 256.0 {
-            let index = self.get_options_tab_index_for_mouse(mouse, screen_width);
-
-            if let Some(index) = index {
+        // Options tab picker and color picker
+        if *button == MouseButton::Left && mouse.x > screen_width - 256.0 {
+            if let Some(index) = self.get_options_tab_index_for_mouse(&mouse, screen_width) {
                 // Change options tab if another options tab was selected
                 self.select_tab(index);
-                return true;
+                return Capture::AllowDrag;
             }
 
-            if self.is_on_object_options() {
+            if self.is_on_object_options() && self.color_picker.click(*button, &mouse, screen_width) {
                 // Do color picker if applicable
-                let _ = self.color_picker.click(button, mouse, screen_width);
-                return true;
+                return Capture::AllowDrag;
             }
         }
 
-        false
+        Capture::Miss
     }
 
     pub fn mouse_release(&mut self, button: MouseButton) {
@@ -187,7 +182,7 @@ impl ToolBox {
     }
 
     pub fn drag(&mut self, _button: MouseButton, interaction: &Interaction, screen_width: f32) -> Capture {
-        if let Interaction::Drag { start, .. } = *interaction {
+        if let Interaction::Drag(DragInteraction { start, .. }) = *interaction {
             if self.is_on_object_options() && self.color_picker.is_selecting_color() {
                 self.color_picker.drag(interaction, screen_width)?;
             }
@@ -229,6 +224,10 @@ impl ToolBox {
         }
 
         None
+    }
+
+    pub fn get_current_options_tab_key(&self) -> options::tab::TabKey {
+        self.options_tab_buttons[self.tab_selection.external_index].key
     }
 
     pub fn update(&mut self, window_width: f32, window_height: f32) {

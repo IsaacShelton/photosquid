@@ -27,6 +27,7 @@ pub struct RenderCtx<'a, 'f> {
     pub square_xyzuv: &'a MeshXyzUv,
     pub color_scheme: &'a ColorScheme,
     pub camera: &'a Camera,
+    pub real_camera: &'a Camera,
     pub display: &'a Display,
 }
 

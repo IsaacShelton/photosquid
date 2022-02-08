@@ -28,6 +28,8 @@ pub struct Rect {
 }
 
 impl Rect {
+    pub const TOOL_NAME: &'static str = "photosquid.rect";
+
     pub fn new() -> Self {
         Self {
             width_input: UserInput::TextInput(TextInput::new("100".into(), "Initial Width".into(), "".into())),
@@ -102,5 +104,9 @@ impl Tool for Rect {
             font,
             vec![&mut self.width_input, &mut self.height_input, &mut self.rotation_input, &mut self.radii_input],
         );
+    }
+
+    fn tool_name(&self) -> &'static str {
+        Self::TOOL_NAME
     }
 }

@@ -393,3 +393,13 @@ impl SelectionIndicator {
             .unwrap();
     }
 }
+
+pub fn find_tool<'a>(tools: &'a mut SlotMap<ToolKey, Box<dyn Tool>>, name: &str) -> Option<&'a mut dyn Tool> {
+    for (tool_key, tool) in tools.iter() {
+        if tool.tool_name() == name {
+            return Some(tools.get_mut(tool_key).unwrap().as_mut());
+        }
+    }
+
+    None
+}

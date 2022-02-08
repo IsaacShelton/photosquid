@@ -23,6 +23,8 @@ pub struct Pointer {
 }
 
 impl Pointer {
+    pub const TOOL_NAME: &'static str = "photosquid.pointer";
+
     pub fn new() -> Self {
         Self {
             translation_snapping_input: UserInput::TextInput(TextInput::new("0".into(), "Translation Snapping".into(), "".into())),
@@ -213,5 +215,9 @@ impl Tool for Pointer {
             font,
             vec![&mut self.translation_snapping_input, &mut self.rotation_snapping_input],
         );
+    }
+
+    fn tool_name(&self) -> &'static str {
+        Self::TOOL_NAME
     }
 }

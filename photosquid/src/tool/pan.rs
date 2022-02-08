@@ -18,6 +18,8 @@ pub struct Pan {
 }
 
 impl Pan {
+    pub const TOOL_NAME: &'static str = "photosquid.pan";
+
     pub fn new() -> Self {
         Self {
             x_input: UserInput::TextInput(TextInput::new("0".into(), "Camera X".into(), "".into())),
@@ -66,13 +68,11 @@ impl Tool for Pan {
                 let real_camera = app.camera.get_real();
 
                 // Apply reverse camera transformation to the drag vector in order to
-                // bring it into world space and then add it to the real camera position
-                // to get the new camera location
+                // bring it into world space and then move the real camera position
+                // in the opposite direction (as if it was being physically dragged)
                 let new_camera_location = real_camera.position - real_camera.apply_reverse_to_vector(&delta);
 
-                // Apply drag
                 app.camera.set_location(new_camera_location);
-
                 Capture::AllowDrag
             }
             Interaction::Click { .. } => Capture::AllowDrag,
@@ -92,5 +92,9 @@ impl Tool for Pan {
         self.update_ui_input_values(ctx.real_camera);
 
         tool::render_user_inputs(ctx, text_system, font, vec![&mut self.x_input, &mut self.y_input]);
+    }
+
+    fn tool_name(&self) -> &'static str {
+        Self::TOOL_NAME
     }
 }

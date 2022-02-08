@@ -26,6 +26,7 @@ mod icon_button;
 mod interaction;
 mod interaction_options;
 mod layer;
+mod linear_set;
 mod math_helpers;
 mod matrix_helpers;
 mod mesh;
@@ -74,7 +75,7 @@ use selection::selection_contains;
 use shaders::Shaders;
 use slotmap::SlotMap;
 use smooth::Smooth;
-use squid::{Initiation, SquidRef};
+use squid::SquidRef;
 use std::{
     collections::btree_set::BTreeSet,
     rc::Rc,
@@ -83,7 +84,7 @@ use std::{
 use tool::{Tool, ToolKey};
 use toolbox::ToolBox;
 
-use crate::interaction::ClickInteraction;
+use crate::{interaction::ClickInteraction, linear_set::LinearSet, toolbox::find_tool};
 
 fn main() {
     // <コ:彡
@@ -159,6 +160,7 @@ fn main() {
         dragging: None,
         selections: vec![],
         keys_held: BTreeSet::new(),
+        mouse_buttons_held: LinearSet::new(),
         modifiers_held: ModifiersState::empty(),
         text_system,
         font: Rc::new(font),
@@ -372,6 +374,30 @@ fn render_television(target: &mut glium::Frame, rendered: &glium::texture::SrgbT
         .unwrap();
 }
 
+fn do_click_context_menu(state: &mut ApplicationState, button: MouseButton, mouse_position: &glm::Vec2) -> Capture {
+    if let Some(context_menu) = &state.context_menu {
+        // Get context menu action
+        let action = context_menu.click(button, &mouse_position);
+
+        // Destroy context menu
+        state.context_menu = None;
+
+        match action {
+            Some(ContextAction::DeleteSelected) => state.delete_selected(),
+            Some(ContextAction::DuplicateSelected) => state.duplicate_selected(),
+            Some(ContextAction::GrabSelected) => state.grab_selected(),
+            Some(ContextAction::RotateSelected) => state.rotate_selected(),
+            Some(ContextAction::ScaleSelected) => state.scale_selected(),
+            Some(ContextAction::Collectively) => state.toggle_next_operation_collectively(),
+            None => return Capture::Miss,
+        }
+
+        Capture::NoDrag
+    } else {
+        Capture::Miss
+    }
+}
+
 fn do_click(
     state: &mut ApplicationState,
     tools: &mut SlotMap<ToolKey, Box<dyn Tool>>,
@@ -379,6 +405,8 @@ fn do_click(
     button: MouseButton,
 ) -> Capture {
     // Returns whether a drag is allowed to start
+
+    state.mouse_buttons_held.insert(button);
 
     use bool_poll::BoolPoll;
 
@@ -392,59 +420,8 @@ fn do_click(
     let position = glm::vec2(position.x, position.y);
     let [width, height]: [f32; 2] = state.dimensions.into();
 
-    if let Some(context_menu) = &state.context_menu {
-        let action = context_menu.click(button, &position);
-        state.context_menu = None;
-
-        if let Some(action) = action {
-            // Handle action
-            match action {
-                ContextAction::DeleteSelected => state.delete_selected(),
-                ContextAction::DuplicateSelected => state.duplicate_selected(),
-                ContextAction::GrabSelected => {
-                    if state.perform_next_operation_collectively {
-                        if let Some(center) = state.get_selection_group_center() {
-                            state.initiate(Initiation::Spread {
-                                point: state.get_mouse_in_world_space(),
-                                center,
-                            });
-                        }
-                        state.perform_next_operation_collectively = false;
-                    } else {
-                        state.initiate(Initiation::Translate);
-                    }
-                }
-                ContextAction::RotateSelected => {
-                    if state.perform_next_operation_collectively {
-                        if let Some(center) = state.get_selection_group_center() {
-                            state.initiate(Initiation::Revolve {
-                                point: state.get_mouse_in_world_space(),
-                                center,
-                            });
-                        }
-                        state.perform_next_operation_collectively = false;
-                    } else {
-                        state.initiate(Initiation::Rotate);
-                    }
-                }
-                ContextAction::ScaleSelected => {
-                    if state.perform_next_operation_collectively {
-                        if let Some(center) = state.get_selection_group_center() {
-                            state.initiate(Initiation::Dilate {
-                                point: state.get_mouse_in_world_space(),
-                                center,
-                            });
-                        }
-                        state.perform_next_operation_collectively = false;
-                    } else {
-                        state.initiate(Initiation::Scale);
-                    }
-                }
-                ContextAction::Collectively => state.perform_next_operation_collectively = !state.perform_next_operation_collectively,
-            }
-            return Capture::NoDrag;
-        }
-    }
+    // Context Menu
+    do_click_context_menu(state, button, &position)?;
 
     let interaction = Interaction::Click(ClickInteraction { button, position });
 
@@ -475,6 +452,8 @@ fn do_mouse_release(app: &mut ApplicationState, button: MouseButton) {
     let animated_camera = app.camera.get_animated();
     let unordered_squids: Vec<SquidRef> = app.ocean.get_squids_unordered().collect();
 
+    app.mouse_buttons_held.remove(&button);
+
     for reference in unordered_squids {
         if let Some(squid) = app.ocean.get_mut(reference) {
             squid.interact(
@@ -496,6 +475,13 @@ fn do_drag(app: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool
     let [width, _]: [f32; 2] = app.dimensions.into();
 
     app.toolbox.drag(MouseButton::Left, &drag, width)?;
+
+    // Redirect middle mouse button to pan tool
+    if app.mouse_buttons_held.contains(&MouseButton::Middle) {
+        if let Some(pan_tool) = find_tool(tools, tool::Pan::TOOL_NAME) {
+            pan_tool.interact(drag, app)?;
+        }
+    }
 
     if let Some(tool_key) = app.toolbox.get_selected() {
         tools[tool_key].interact(drag, app)?;

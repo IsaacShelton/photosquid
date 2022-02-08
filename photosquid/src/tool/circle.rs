@@ -21,6 +21,8 @@ pub struct Circle {
 }
 
 impl Circle {
+    pub const TOOL_NAME: &'static str = "photosquid.circle";
+
     pub fn new() -> Self {
         Self {
             radius_input: UserInput::TextInput(TextInput::new("50".into(), "Initial Radius".into(), "".into())),
@@ -59,5 +61,9 @@ impl Tool for Circle {
 
     fn render_options(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>) {
         tool::render_user_inputs(ctx, text_system, font, vec![&mut self.radius_input]);
+    }
+
+    fn tool_name(&self) -> &'static str {
+        Self::TOOL_NAME
     }
 }

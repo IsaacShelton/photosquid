@@ -23,6 +23,8 @@ pub struct Tri {
 }
 
 impl Tri {
+    pub const TOOL_NAME: &'static str = "photosquid.tri";
+
     pub fn new() -> Tri {
         Self {
             rotation_input: UserInput::TextInput(TextInput::new("0".into(), "Initial Rotation".into(), " degrees".into())),
@@ -68,5 +70,9 @@ impl Tool for Tri {
 
     fn render_options(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>) {
         tool::render_user_inputs(ctx, text_system, font, vec![&mut self.rotation_input]);
+    }
+
+    fn tool_name(&self) -> &'static str {
+        Self::TOOL_NAME
     }
 }

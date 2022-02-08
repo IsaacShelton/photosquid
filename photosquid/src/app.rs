@@ -7,6 +7,7 @@ use crate::{
     history::History,
     interaction::{Interaction, KeyInteraction},
     interaction_options::InteractionOptions,
+    linear_set::LinearSet,
     mesh::{MeshXyz, MeshXyzUv},
     ocean::Ocean,
     operation::Operation,
@@ -21,7 +22,7 @@ use angular_units::Rad;
 use glium::{
     glutin::{
         dpi::LogicalPosition,
-        event::{ModifiersState, VirtualKeyCode},
+        event::{ModifiersState, MouseButton, VirtualKeyCode},
         window::CursorIcon,
     },
     Display,
@@ -54,6 +55,7 @@ pub struct ApplicationState {
     pub dragging: Option<Dragging>,
     pub selections: Vec<Selection>,
     pub keys_held: BTreeSet<VirtualKeyCode>,
+    pub mouse_buttons_held: LinearSet<MouseButton>,
     pub modifiers_held: ModifiersState,
     pub text_system: TextSystem,
     pub font: Rc<FontTexture>,
@@ -262,6 +264,52 @@ impl ApplicationState {
 
         self.selections.clear();
         self.selections = created.iter().map(|squid_id| Selection::new(*squid_id, None)).collect();
+    }
+
+    pub fn grab_selected(&mut self) {
+        if self.perform_next_operation_collectively {
+            if let Some(center) = self.get_selection_group_center() {
+                self.initiate(Initiation::Spread {
+                    point: self.get_mouse_in_world_space(),
+                    center,
+                });
+            }
+            self.perform_next_operation_collectively = false;
+        } else {
+            self.initiate(Initiation::Translate);
+        }
+    }
+
+    pub fn rotate_selected(&mut self) {
+        if self.perform_next_operation_collectively {
+            if let Some(center) = self.get_selection_group_center() {
+                self.initiate(Initiation::Revolve {
+                    point: self.get_mouse_in_world_space(),
+                    center,
+                });
+            }
+            self.perform_next_operation_collectively = false;
+        } else {
+            self.initiate(Initiation::Rotate);
+        }
+    }
+
+    pub fn scale_selected(&mut self) {
+        if self.perform_next_operation_collectively {
+            if let Some(center) = self.get_selection_group_center() {
+                self.initiate(Initiation::Dilate {
+                    point: self.get_mouse_in_world_space(),
+                    center,
+                });
+            }
+            self.perform_next_operation_collectively = false;
+        } else {
+            self.initiate(Initiation::Scale);
+        }
+    }
+
+    pub fn toggle_next_operation_collectively(&mut self) {
+        self.perform_next_operation_collectively = !self.perform_next_operation_collectively;
     }
 
     pub fn get_selected_squids(&self) -> Vec<SquidRef> {

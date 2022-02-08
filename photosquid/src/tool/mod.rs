@@ -35,6 +35,8 @@ pub trait Tool {
     }
 
     fn render_options(&mut self, _ctx: &mut RenderCtx, _text_system: &TextSystem, _font: Rc<FontTexture>) {}
+
+    fn tool_name(&self) -> &'static str;
 }
 
 pub fn get_nth_input_area(n: usize) -> AABB {
@@ -88,10 +90,7 @@ fn key_user_inputs(user_inputs: &mut Vec<&mut UserInput>, key_interaction: KeyIn
     Capture::Miss
 }
 
-pub fn interact_user_inputs(user_inputs: Vec<&mut UserInput>, interaction: Interaction, app: &mut ApplicationState) -> Capture {
-    // Allow 'user_inputs' parameter to be mutable (it is a copy anyways)
-    let mut user_inputs = user_inputs;
-
+pub fn interact_user_inputs(mut user_inputs: Vec<&mut UserInput>, interaction: Interaction, app: &mut ApplicationState) -> Capture {
     match interaction {
         Interaction::Click(click_interaction) => click_user_inputs(&mut user_inputs, click_interaction),
         Interaction::Key(key_interaction) => key_user_inputs(&mut user_inputs, key_interaction, app),

@@ -1,6 +1,6 @@
 use super::Tab;
 use crate::{
-    app::ApplicationState,
+    app::App,
     capture::Capture,
     color::Color,
     interaction::Interaction,
@@ -93,7 +93,7 @@ impl Layers {
 }
 
 impl Tab for Layers {
-    fn interact(&mut self, _interaction: Interaction, _app: &mut ApplicationState) -> Capture {
+    fn interact(&mut self, _interaction: Interaction, _app: &mut App) -> Capture {
         Capture::Miss
     }
 

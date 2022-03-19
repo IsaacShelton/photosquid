@@ -6,7 +6,8 @@ mod tri;
 
 use crate::{
     aabb::AABB,
-    app::ApplicationState,
+    app::App,
+    camera::EasySmoothCamera,
     capture::{Capture, KeyCapture},
     interaction::{ClickInteraction, Interaction, KeyInteraction},
     render_ctx::RenderCtx,
@@ -18,91 +19,177 @@ use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;
 use slotmap::new_key_type;
 use std::rc::Rc;
-
-pub use circle::Circle;
-pub use pan::Pan;
-pub use pointer::Pointer;
-pub use rect::Rect;
-pub use tri::Tri;
+use VirtualKeyCode::Escape;
 
 new_key_type! { pub struct ToolKey; }
 
-pub trait Tool {
-    fn interact(&mut self, interaction: Interaction, app: &mut ApplicationState) -> Capture;
+#[derive(Copy, Clone, PartialEq)]
+pub enum ToolKind {
+    Circle,
+    Pan,
+    Pointer,
+    Rect,
+    Tri,
+}
 
-    fn interact_options(&mut self, _interaction: Interaction, _app: &mut ApplicationState) -> Capture {
+pub struct Tool {
+    kind: ToolKind,
+    user_inputs: Vec<UserInput>,
+}
+
+impl Tool {
+    pub fn circle() -> Self {
+        Self {
+            kind: ToolKind::Circle,
+            user_inputs: vec![UserInput::TextInput(TextInput::new("50".into(), "Initial Radius".into(), "".into()))],
+        }
+    }
+
+    pub fn pan() -> Self {
+        Self {
+            kind: ToolKind::Pan,
+            user_inputs: vec![
+                UserInput::TextInput(TextInput::new("0".into(), "Camera X".into(), "".into())),
+                UserInput::TextInput(TextInput::new("0".into(), "Camera Y".into(), "".into())),
+            ],
+        }
+    }
+
+    pub fn pointer() -> Self {
+        Self {
+            kind: ToolKind::Pointer,
+            user_inputs: vec![
+                UserInput::TextInput(TextInput::new("0".into(), "Translation Snapping".into(), "".into())),
+                UserInput::TextInput(TextInput::new("0".into(), "Rotation Snapping".into(), " degrees".into())),
+            ],
+        }
+    }
+
+    pub fn rect() -> Self {
+        Self {
+            kind: ToolKind::Rect,
+            user_inputs: vec![
+                UserInput::TextInput(TextInput::new("100".into(), "Initial Width".into(), "".into())),
+                UserInput::TextInput(TextInput::new("100".into(), "Initial Height".into(), "".into())),
+                UserInput::TextInput(TextInput::new("0".into(), "Initial Rotation".into(), " degrees".into())),
+                UserInput::TextInput(TextInput::new("0".into(), "Initial Corner Radii".into(), "".into())),
+            ],
+        }
+    }
+
+    pub fn tri() -> Self {
+        Self {
+            kind: ToolKind::Tri,
+            user_inputs: vec![UserInput::TextInput(TextInput::new("0".into(), "Initial Rotation".into(), " degrees".into()))],
+        }
+    }
+
+    pub fn interact(&mut self, interaction: Interaction, app: &mut App) -> Capture {
+        match self.kind {
+            ToolKind::Circle => circle::interact(&mut self.user_inputs, interaction, app),
+            ToolKind::Pan => pan::interact(&mut self.user_inputs, interaction, app),
+            ToolKind::Pointer => pointer::interact(&mut self.user_inputs, interaction, app),
+            ToolKind::Rect => rect::interact(&mut self.user_inputs, interaction, app),
+            ToolKind::Tri => tri::interact(&mut self.user_inputs, interaction, app),
+        }
+    }
+
+    pub fn interact_options(&mut self, interaction: Interaction, app: &mut App) -> Capture {
+        // Do interaction
+        let capture = self.interact_options_impl(interaction, app);
+
+        // Post interaction
+        match self.kind {
+            ToolKind::Pan => {
+                let existing_position = app.camera.get_real().position;
+
+                // Update options
+                if let Some(new_content) = self.user_inputs[0].as_text_input_mut().unwrap().poll() {
+                    let new_x = new_content.parse::<f32>().unwrap_or_default();
+                    app.camera.set_location(glm::vec2(new_x, existing_position.y));
+                }
+
+                if let Some(new_content) = self.user_inputs[1].as_text_input_mut().unwrap().poll() {
+                    let new_y = new_content.parse::<f32>().unwrap_or_default();
+                    app.camera.set_location(glm::vec2(existing_position.x, new_y));
+                }
+            }
+            _ => (),
+        }
+
+        capture
+    }
+
+    fn interact_options_impl(&mut self, interaction: Interaction, app: &mut App) -> Capture {
+        match interaction {
+            Interaction::Click(ClickInteraction { button, position }) => {
+                let index_took_focus = self.user_inputs.iter_mut().enumerate().find_map(|(i, user_input)| {
+                    if user_input.click(button, &position, &get_nth_input_area(i)) == Capture::TakeFocus {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                });
+
+                if let Some(index_took_focus) = index_took_focus {
+                    for (i, user_input) in self.user_inputs.iter_mut().enumerate() {
+                        if i != index_took_focus {
+                            user_input.unfocus();
+                        }
+                    }
+                    return Capture::TakeFocus;
+                }
+            }
+            Interaction::Key(KeyInteraction { virtual_keycode }) => {
+                let shift = app.keys_held.contains(&VirtualKeyCode::LShift);
+
+                if let Some(key_capture) = self
+                    .user_inputs
+                    .iter_mut()
+                    .find_map(|user_input| user_input.key_press(virtual_keycode, shift).to_option())
+                {
+                    return Capture::Keyboard(key_capture);
+                }
+
+                if self.kind == ToolKind::Pointer && virtual_keycode == Escape {
+                    app.selections.clear();
+                    return Capture::Keyboard(KeyCapture::Capture);
+                }
+            }
+            _ => (),
+        }
+
         Capture::Miss
     }
 
-    fn render_options(&mut self, _ctx: &mut RenderCtx, _text_system: &TextSystem, _font: Rc<FontTexture>) {}
+    pub fn render_options(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>) {
+        // Pre-render
+        match self.kind {
+            ToolKind::Pan => {
+                let x_input = self.user_inputs[0].as_text_input_mut().unwrap();
+                if !x_input.is_focused() {
+                    x_input.set(&ctx.real_camera.position.x.round().to_string());
+                }
 
-    fn tool_name(&self) -> &'static str;
+                let y_input = self.user_inputs[1].as_text_input_mut().unwrap();
+                if !y_input.is_focused() {
+                    y_input.set(&ctx.real_camera.position.y.round().to_string());
+                }
+            }
+            _ => (),
+        }
+
+        // Render
+        for i in 0..self.user_inputs.len() {
+            self.user_inputs[i].render(ctx, text_system, font.clone(), &get_nth_input_area(i));
+        }
+    }
+
+    pub fn kind(&self) -> ToolKind {
+        self.kind
+    }
 }
 
-pub fn get_nth_input_area(n: usize) -> AABB {
+fn get_nth_input_area(n: usize) -> AABB {
     TextInput::standard_area(&glm::vec2(64.0, 128.0 + n as f32 * 80.0))
-}
-
-fn take_focus_from_user_inputs_except(user_inputs: &mut Vec<&mut UserInput>, except_i: usize) {
-    for (i, user_input) in user_inputs.iter_mut().enumerate() {
-        if i != except_i {
-            user_input.unfocus();
-        }
-    }
-}
-
-fn click_user_inputs(user_inputs: &mut Vec<&mut UserInput>, click_interaction: ClickInteraction) -> Capture {
-    let mut capture: Option<Capture> = None;
-    let mut from_i = 0;
-
-    for (i, user_input) in user_inputs.iter_mut().enumerate() {
-        let area = get_nth_input_area(i);
-        let click_capture = user_input.click(click_interaction.button, &click_interaction.position, &area);
-
-        if click_capture == Capture::TakeFocus {
-            from_i = i;
-            capture = Some(click_capture);
-            break;
-        }
-    }
-
-    if let Some(capture) = capture {
-        if let Capture::TakeFocus = capture {
-            take_focus_from_user_inputs_except(user_inputs, from_i);
-        }
-        capture?;
-    }
-
-    Capture::Miss
-}
-
-fn key_user_inputs(user_inputs: &mut Vec<&mut UserInput>, key_interaction: KeyInteraction, app: &mut ApplicationState) -> Capture {
-    let shift = app.keys_held.contains(&VirtualKeyCode::LShift);
-
-    for user_input in user_inputs {
-        let key_capture = user_input.key_press(key_interaction.virtual_keycode, shift);
-
-        if key_capture != KeyCapture::Miss {
-            return Capture::Keyboard(key_capture);
-        }
-    }
-
-    Capture::Miss
-}
-
-pub fn interact_user_inputs(mut user_inputs: Vec<&mut UserInput>, interaction: Interaction, app: &mut ApplicationState) -> Capture {
-    match interaction {
-        Interaction::Click(click_interaction) => click_user_inputs(&mut user_inputs, click_interaction),
-        Interaction::Key(key_interaction) => key_user_inputs(&mut user_inputs, key_interaction, app),
-        _ => Capture::Miss,
-    }
-}
-
-pub fn render_user_inputs(ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>, user_inputs: Vec<&mut UserInput>) {
-    let mut user_inputs = user_inputs;
-
-    for (i, user_input) in user_inputs.drain(0..).enumerate() {
-        let area = get_nth_input_area(i);
-        user_input.render(ctx, text_system, font.clone(), &area);
-    }
 }

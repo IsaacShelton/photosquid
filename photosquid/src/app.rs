@@ -34,7 +34,7 @@ use std::{collections::btree_set::BTreeSet, rc::Rc, time::Instant};
 
 pub const MULTISAMPLING_COUNT: u16 = 4;
 
-pub struct ApplicationState {
+pub struct App {
     pub display: Display,
     pub color_scheme: ColorScheme,
     pub toolbox: ToolBox,
@@ -80,7 +80,7 @@ impl ControlOrCommand for ModifiersState {
     }
 }
 
-impl ApplicationState {
+impl App {
     // Tries to interact with any already selected squids
     // Returns whether interaction was captured
     pub fn preclick(&mut self) {
@@ -127,7 +127,7 @@ impl ApplicationState {
         self.camera.zoom_point(zoom, &center);
     }
 
-    pub fn press_key(&mut self, key: VirtualKeyCode, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>) {
+    pub fn press_key(&mut self, key: VirtualKeyCode, tools: &mut SlotMap<ToolKey, Tool>) {
         use crate::camera::EasySmoothCamera;
 
         if self.modifiers_held.control_or_command() && key == VirtualKeyCode::Z {

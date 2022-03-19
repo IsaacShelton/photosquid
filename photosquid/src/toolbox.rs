@@ -11,8 +11,7 @@ use crate::{
     render_ctx::RenderCtx,
     selection::Selection,
     smooth::Smooth,
-    tool,
-    tool::{Tool, ToolKey},
+    tool::{Tool, ToolKey, ToolKind},
     tool_button::ToolButton,
     ColorScheme,
 };
@@ -52,41 +51,41 @@ impl ToolBox {
         }
     }
 
-    pub fn create_standard_tools(&mut self, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>, display: &Display) {
+    pub fn create_standard_tools(&mut self, tools: &mut SlotMap<ToolKey, Tool>, display: &Display) {
         // Create tools and corresponding tool buttons
 
         self.add_tool_button(ToolButton::new(
             include_str!("_src_objs/pointer.obj"),
             PressAnimation::Deform,
-            tools.insert(Box::new(tool::Pointer::new())),
+            tools.insert(Tool::pointer()),
             display,
         ));
 
         self.add_tool_button(ToolButton::new(
             include_str!("_src_objs/pan.obj"),
             PressAnimation::Deform,
-            tools.insert(Box::new(tool::Pan::new())),
+            tools.insert(Tool::pan()),
             display,
         ));
 
         self.add_tool_button(ToolButton::new(
             include_str!("_src_objs/rectangle.obj"),
             PressAnimation::Deform,
-            tools.insert(Box::new(tool::Rect::new())),
+            tools.insert(Tool::rect()),
             display,
         ));
 
         self.add_tool_button(ToolButton::new(
             include_str!("_src_objs/triangle.obj"),
             PressAnimation::Deform,
-            tools.insert(Box::new(tool::Tri::new())),
+            tools.insert(Tool::tri()),
             display,
         ));
 
         self.add_tool_button(ToolButton::new(
             include_str!("_src_objs/circle.obj"),
             PressAnimation::Deform,
-            tools.insert(Box::new(tool::Circle::new())),
+            tools.insert(Tool::circle()),
             display,
         ));
 
@@ -296,7 +295,7 @@ impl ToolBox {
     pub fn render(
         &mut self,
         ctx: &mut RenderCtx,
-        tools: &mut SlotMap<ToolKey, Box<dyn Tool>>,
+        tools: &mut SlotMap<ToolKey, Tool>,
         options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>,
         color_scheme: &ColorScheme,
         text_system: &TextSystem,
@@ -394,10 +393,10 @@ impl SelectionIndicator {
     }
 }
 
-pub fn find_tool<'a>(tools: &'a mut SlotMap<ToolKey, Box<dyn Tool>>, name: &str) -> Option<&'a mut dyn Tool> {
+pub fn find_tool<'a>(tools: &'a mut SlotMap<ToolKey, Tool>, kind: ToolKind) -> Option<&'a mut Tool> {
     for (tool_key, tool) in tools.iter() {
-        if tool.tool_name() == name {
-            return Some(tools.get_mut(tool_key).unwrap().as_mut());
+        if tool.kind() == kind {
+            return Some(tools.get_mut(tool_key).unwrap());
         }
     }
 

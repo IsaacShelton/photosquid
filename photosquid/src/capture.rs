@@ -23,6 +23,16 @@ pub enum KeyCapture {
     Miss,
 }
 
+impl KeyCapture {
+    pub fn to_option(self) -> Option<KeyCapture> {
+        if self != KeyCapture::Miss {
+            Some(self)
+        } else {
+            None
+        }
+    }
+}
+
 impl Try for Capture {
     type Output = Capture;
     type Residual = Capture;

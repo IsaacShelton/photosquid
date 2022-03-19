@@ -1,78 +1,36 @@
 use crate::{
-    app::ApplicationState,
+    app::App,
     capture::Capture,
     interaction::{ClickInteraction, Interaction},
-    render_ctx::RenderCtx,
-    squid::Tri as TriSquid,
-    text_input::TextInput,
-    tool,
-    tool::Tool,
+    squid,
     user_input::UserInput,
 };
 use angular_units::Rad;
 use glium::glutin::event::MouseButton;
-use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;
-use std::rc::Rc;
 
-pub struct Tri {
-    rotation_input: UserInput,
-
-    // Tool options
-    initial_rotation: Rad<f32>,
-}
-
-impl Tri {
-    pub const TOOL_NAME: &'static str = "photosquid.tri";
-
-    pub fn new() -> Tri {
-        Self {
-            rotation_input: UserInput::TextInput(TextInput::new("0".into(), "Initial Rotation".into(), " degrees".into())),
-            initial_rotation: Rad(0.0),
-        }
-    }
-}
-
-impl Tool for Tri {
-    fn interact(&mut self, interaction: Interaction, app: &mut ApplicationState) -> Capture {
-        // Update options
-        if let Some(new_content) = self.rotation_input.as_text_input_mut().unwrap().poll() {
-            self.initial_rotation = Rad(new_content.parse::<f32>().unwrap_or_default().max(0.0) * std::f32::consts::PI / 180.0);
-        }
-
-        // Handle interaction
-        if let Interaction::Click(ClickInteraction {
+pub fn interact(user_inputs: &mut Vec<UserInput>, interaction: Interaction, app: &mut App) -> Capture {
+    match interaction {
+        Interaction::Click(ClickInteraction {
             button: MouseButton::Left,
             position: click_coords,
-        }) = interaction
-        {
+        }) => {
             let camera = app.camera.get_animated();
             let world_position = camera.apply_reverse(&click_coords);
             let color = app.toolbox.color_picker.calculate_color();
 
-            app.insert(Box::new(TriSquid::new(
+            let rotation = Rad(user_inputs[0].as_text_input_mut().unwrap().text().parse::<f32>().unwrap_or_default() * std::f32::consts::PI / 180.0);
+
+            app.insert(Box::new(squid::Tri::new(
                 world_position + glm::vec2(0.0, -50.0),
                 world_position + glm::vec2(50.0, 50.0),
                 world_position + glm::vec2(-50.0, 50.0),
-                self.initial_rotation,
+                rotation,
                 color,
             )));
 
             Capture::AllowDrag
-        } else {
-            Capture::Miss
         }
-    }
-
-    fn interact_options(&mut self, interaction: Interaction, app: &mut ApplicationState) -> Capture {
-        tool::interact_user_inputs(vec![&mut self.rotation_input], interaction, app)
-    }
-
-    fn render_options(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>) {
-        tool::render_user_inputs(ctx, text_system, font, vec![&mut self.rotation_input]);
-    }
-
-    fn tool_name(&self) -> &'static str {
-        Self::TOOL_NAME
+        _ => Capture::Miss,
     }
 }

@@ -221,10 +221,12 @@ impl TextInput {
         );
     }
 
+    #[allow(unused)]
     pub fn is_focused(&self) -> bool {
         self.focused
     }
 
+    #[allow(unused)]
     pub fn set(&mut self, content: &str) {
         self.clear();
 
@@ -256,5 +258,9 @@ impl TextInput {
             VirtualKeyCode::Minus => Some('-'),
             _ => None,
         }
+    }
+
+    pub fn text(&self) -> &str {
+        &self.text
     }
 }

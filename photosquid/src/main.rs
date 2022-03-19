@@ -51,7 +51,7 @@ mod vertex;
 
 const TARGET_FPS: u64 = 60;
 
-use app::{ApplicationState, MULTISAMPLING_COUNT};
+use app::{App, MULTISAMPLING_COUNT};
 use camera::Camera;
 use capture::Capture;
 use color_scheme::ColorScheme;
@@ -81,7 +81,7 @@ use std::{
     rc::Rc,
     time::{Duration, Instant},
 };
-use tool::{Tool, ToolKey};
+use tool::{Tool, ToolKey, ToolKind};
 use toolbox::ToolBox;
 
 use crate::{interaction::ClickInteraction, linear_set::LinearSet, toolbox::find_tool};
@@ -106,7 +106,7 @@ fn main() {
 
     // Build toolbox
     let mut toolbox = ToolBox::new(&display);
-    let mut tools: SlotMap<ToolKey, Box<dyn Tool>> = SlotMap::with_key();
+    let mut tools: SlotMap<ToolKey, Tool> = SlotMap::with_key();
     let mut options_tabs: SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>> = SlotMap::with_key();
 
     // Create standard tool set
@@ -139,7 +139,7 @@ fn main() {
     let framebuffer_dimensions = display.get_framebuffer_dimensions();
     let initial_dimensions = view_size_from_framebuffer_dimensions(framebuffer_dimensions, scale_factor);
 
-    let mut app = ApplicationState {
+    let mut app = App {
         display,
         color_scheme: Default::default(),
         toolbox,
@@ -205,8 +205,8 @@ fn main() {
 
 fn on_event(
     abstract_event: glium::glutin::event::Event<()>,
-    app: &mut ApplicationState,
-    tools: &mut SlotMap<ToolKey, Box<dyn Tool>>,
+    app: &mut App,
+    tools: &mut SlotMap<ToolKey, Tool>,
     options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>,
 ) -> Option<ControlFlow> {
     match abstract_event {
@@ -226,7 +226,7 @@ fn on_event(
     None
 }
 
-fn update_components(app: &mut ApplicationState) {
+fn update_components(app: &mut App) {
     let [width, height]: [f32; 2] = app.dimensions.into();
 
     app.toolbox.update(width, height);
@@ -240,11 +240,7 @@ fn update_components(app: &mut ApplicationState) {
     }
 }
 
-fn redraw(
-    app: &mut ApplicationState,
-    tools: &mut SlotMap<ToolKey, Box<dyn Tool>>,
-    options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>,
-) {
+fn redraw(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>, options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>) {
     // Get dimensions of window
     let [width, height]: [f32; 2] = app.dimensions.into();
     let (width_u32, height_u32) = app.display.get_framebuffer_dimensions();
@@ -275,8 +271,8 @@ fn redraw(
 }
 
 fn render_app<'f>(
-    app: &mut ApplicationState,
-    tools: &mut SlotMap<ToolKey, Box<dyn Tool>>,
+    app: &mut App,
+    tools: &mut SlotMap<ToolKey, Tool>,
     options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>,
     target: &'f mut glium::Frame,
     framebuffer: &'f mut glium::framebuffer::SimpleFrameBuffer<'f>,
@@ -294,7 +290,7 @@ fn render_app<'f>(
     // we will render to a framebuffer first (since more pixels will be sampled anyways),
     // but for displays that have a 1-factor ratio, we will render directly and utilize
     // the built in MSAA for the window render target (this is the only portable way apparently)
-    // Render context is a subset of ApplicationState that only
+    // Render context is a subset of App that only
     // contains information related to rendering
 
     let mut ctx: RenderCtx<'_, 'f> = RenderCtx {
@@ -374,21 +370,21 @@ fn render_television(target: &mut glium::Frame, rendered: &glium::texture::SrgbT
         .unwrap();
 }
 
-fn do_click_context_menu(state: &mut ApplicationState, button: MouseButton, mouse_position: &glm::Vec2) -> Capture {
-    if let Some(context_menu) = &state.context_menu {
+fn do_click_context_menu(app: &mut App, button: MouseButton, mouse_position: &glm::Vec2) -> Capture {
+    if let Some(context_menu) = &app.context_menu {
         // Get context menu action
         let action = context_menu.click(button, &mouse_position);
 
         // Destroy context menu
-        state.context_menu = None;
+        app.context_menu = None;
 
         match action {
-            Some(ContextAction::DeleteSelected) => state.delete_selected(),
-            Some(ContextAction::DuplicateSelected) => state.duplicate_selected(),
-            Some(ContextAction::GrabSelected) => state.grab_selected(),
-            Some(ContextAction::RotateSelected) => state.rotate_selected(),
-            Some(ContextAction::ScaleSelected) => state.scale_selected(),
-            Some(ContextAction::Collectively) => state.toggle_next_operation_collectively(),
+            Some(ContextAction::DeleteSelected) => app.delete_selected(),
+            Some(ContextAction::DuplicateSelected) => app.duplicate_selected(),
+            Some(ContextAction::GrabSelected) => app.grab_selected(),
+            Some(ContextAction::RotateSelected) => app.rotate_selected(),
+            Some(ContextAction::ScaleSelected) => app.scale_selected(),
+            Some(ContextAction::Collectively) => app.toggle_next_operation_collectively(),
             None => return Capture::Miss,
         }
 
@@ -399,54 +395,54 @@ fn do_click_context_menu(state: &mut ApplicationState, button: MouseButton, mous
 }
 
 fn do_click(
-    state: &mut ApplicationState,
-    tools: &mut SlotMap<ToolKey, Box<dyn Tool>>,
+    app: &mut App,
+    tools: &mut SlotMap<ToolKey, Tool>,
     options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>,
     button: MouseButton,
 ) -> Capture {
     // Returns whether a drag is allowed to start
 
-    state.mouse_buttons_held.insert(button);
+    app.mouse_buttons_held.insert(button);
 
     use bool_poll::BoolPoll;
 
-    if state.wait_for_stop_drag.poll() {
-        state.dragging = None;
-        state.operation = None;
+    if app.wait_for_stop_drag.poll() {
+        app.dragging = None;
+        app.operation = None;
         return Capture::NoDrag;
     }
 
-    let position = state.mouse_position.unwrap();
+    let position = app.mouse_position.unwrap();
     let position = glm::vec2(position.x, position.y);
-    let [width, height]: [f32; 2] = state.dimensions.into();
+    let [width, height]: [f32; 2] = app.dimensions.into();
 
     // Context Menu
-    do_click_context_menu(state, button, &position)?;
+    do_click_context_menu(app, button, &position)?;
 
     let interaction = Interaction::Click(ClickInteraction { button, position });
 
     // Tool options ribbon
-    if let Some(tool_key) = state.toolbox.get_selected() {
-        tools[tool_key].interact_options(interaction, state)?;
+    if let Some(tool_key) = app.toolbox.get_selected() {
+        tools[tool_key].interact_options(interaction, app)?;
     }
 
     // Tool ribbon
-    state.toolbox.click(interaction, width, height)?;
+    app.toolbox.click(interaction, width, height)?;
 
     if button == MouseButton::Left && position.x > width - 256.0 {
-        if let Some(current_tab) = options_tabs.get_mut(state.toolbox.get_current_options_tab_key()) {
-            return current_tab.interact(interaction, state);
+        if let Some(current_tab) = options_tabs.get_mut(app.toolbox.get_current_options_tab_key()) {
+            return current_tab.interact(interaction, app);
         }
     }
 
-    if let Some(tool_key) = state.toolbox.get_selected() {
-        tools[tool_key].interact(interaction, state)?;
+    if let Some(tool_key) = app.toolbox.get_selected() {
+        tools[tool_key].interact(interaction, app)?;
     }
 
     Capture::Miss
 }
 
-fn do_mouse_release(app: &mut ApplicationState, button: MouseButton) {
+fn do_mouse_release(app: &mut App, button: MouseButton) {
     let position = app.mouse_position.unwrap();
     let position = glm::vec2(position.x, position.y);
     let animated_camera = app.camera.get_animated();
@@ -470,7 +466,7 @@ fn do_mouse_release(app: &mut ApplicationState, button: MouseButton) {
     app.add_history_marker();
 }
 
-fn do_drag(app: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>) -> Capture {
+fn do_drag(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>) -> Capture {
     let drag = app.dragging.as_ref().unwrap().to_interaction();
     let [width, _]: [f32; 2] = app.dimensions.into();
 
@@ -478,7 +474,7 @@ fn do_drag(app: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool
 
     // Redirect middle mouse button to pan tool
     if app.mouse_buttons_held.contains(&MouseButton::Middle) {
-        if let Some(pan_tool) = find_tool(tools, tool::Pan::TOOL_NAME) {
+        if let Some(pan_tool) = find_tool(tools, ToolKind::Pan) {
             pan_tool.interact(drag, app)?;
         }
     }
@@ -490,7 +486,7 @@ fn do_drag(app: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool
     Capture::Miss
 }
 
-pub fn on_keyboard_input(app: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>, input: glium::glutin::event::KeyboardInput) {
+pub fn on_keyboard_input(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>, input: glium::glutin::event::KeyboardInput) {
     if let Some(virtual_keycode) = input.virtual_keycode {
         let keys_held = &mut app.keys_held;
 
@@ -509,8 +505,8 @@ pub fn on_keyboard_input(app: &mut ApplicationState, tools: &mut SlotMap<ToolKey
 }
 
 fn on_mouse_input(
-    app: &mut ApplicationState,
-    tools: &mut SlotMap<ToolKey, Box<dyn Tool>>,
+    app: &mut App,
+    tools: &mut SlotMap<ToolKey, Tool>,
     options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>,
     state: ElementState,
     button: MouseButton,
@@ -532,7 +528,7 @@ fn on_mouse_input(
     }
 }
 
-fn on_mouse_move(app: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dyn Tool>>, position: glium::glutin::dpi::PhysicalPosition<f64>) {
+fn on_mouse_move(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>, position: glium::glutin::dpi::PhysicalPosition<f64>) {
     app.mouse_position = Some(position.to_logical(app.scale_factor));
 
     if let Some(dragging) = app.dragging.as_mut() {
@@ -544,7 +540,7 @@ fn on_mouse_move(app: &mut ApplicationState, tools: &mut SlotMap<ToolKey, Box<dy
     }
 }
 
-fn on_scroll(app: &mut ApplicationState, scroll: MouseScrollDelta) {
+fn on_scroll(app: &mut App, scroll: MouseScrollDelta) {
     if let MouseScrollDelta::PixelDelta(logical_pixel_delta) = scroll {
         app.scroll(&glm::vec2(logical_pixel_delta.x as f32, logical_pixel_delta.y as f32));
     }

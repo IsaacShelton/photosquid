@@ -90,7 +90,7 @@ impl MeshXyz {
         Self::new(include_str!("_src_objs/shape/circle.obj"), display)
     }
 
-    pub fn new_rect(display: &Display, width: f32, height: f32, radii: f32) -> Self {
+    pub fn new_rect(display: &Display, size: glm::Vec2, radii: f32) -> Self {
         use lyon::{
             path::{
                 builder::{BorderRadii, PathBuilder},
@@ -100,8 +100,8 @@ impl MeshXyz {
             tessellation::{BuffersBuilder, FillOptions, FillTessellator, FillVertex, VertexBuffers},
         };
 
-        let width = width.abs();
-        let height = height.abs();
+        let width = size.x.abs();
+        let height = size.y.abs();
 
         let mut builder = lyon::path::Path::builder();
         builder.add_rounded_rectangle(
@@ -125,13 +125,14 @@ impl MeshXyz {
                 }),
             )
             .unwrap();
-        return Self::from_vertices_and_indices(&geometry.vertices, &geometry.indices, display);
+
+        Self::from_vertices_and_indices(&geometry.vertices, &geometry.indices, display)
     }
 
-    pub fn render(&self, ctx: &mut RenderCtx, x: f32, y: f32, w_scale: f32, h_scale: f32, color: &Color) {
+    pub fn render(&self, ctx: &mut RenderCtx, position: glm::Vec2, scale: glm::Vec2, color: &Color) {
         let identity = glm::identity::<f32, 4>();
-        let transformation = glm::translation(&glm::vec3(x, y, 0.0));
-        let transformation = glm::scale(&transformation, &glm::vec3(w_scale, h_scale, 0.0));
+        let transformation = glm::translation(&glm::vec2_to_vec3(&position));
+        let transformation = glm::scale(&transformation, &glm::vec2_to_vec3(&scale));
 
         let uniforms = glium::uniform! {
             transformation: reach_inside_mat4(&transformation),

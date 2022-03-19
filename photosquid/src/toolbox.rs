@@ -161,13 +161,13 @@ impl ToolBox {
 
         // Options tab picker and color picker
         if *button == MouseButton::Left && mouse.x > screen_width - 256.0 {
-            if let Some(index) = self.get_options_tab_index_for_mouse(&mouse, screen_width) {
+            if let Some(index) = self.get_options_tab_index_for_mouse(*mouse, screen_width) {
                 // Change options tab if another options tab was selected
                 self.select_tab(index);
                 return Capture::AllowDrag;
             }
 
-            if self.is_on_object_options() && self.color_picker.click(*button, &mouse, screen_width) {
+            if self.is_on_object_options() && self.color_picker.click(*button, *mouse, screen_width) {
                 // Do color picker if applicable
                 return Capture::AllowDrag;
             }
@@ -207,7 +207,7 @@ impl ToolBox {
         None
     }
 
-    fn get_options_tab_index_for_mouse(&self, mouse: &glm::Vec2, window_width: f32) -> Option<usize> {
+    fn get_options_tab_index_for_mouse(&self, mouse: glm::Vec2, window_width: f32) -> Option<usize> {
         if mouse.y >= self.options_tab_region_height {
             return None;
         }
@@ -304,7 +304,8 @@ impl ToolBox {
         selections: &[Selection],
     ) {
         // Background
-        ctx.ribbon_mesh.render(ctx, 0.0, 0.0, self.full_width, ctx.height, &color_scheme.dark_ribbon);
+        ctx.ribbon_mesh
+            .render(ctx, glm::zero(), glm::vec2(self.full_width, ctx.height), &color_scheme.dark_ribbon);
 
         // Icons
         for button in &mut self.buttons {
@@ -321,7 +322,7 @@ impl ToolBox {
 
         // Options background
         ctx.ribbon_mesh
-            .render(ctx, ctx.width - 256.0, 0.0, 256.0, ctx.height, &color_scheme.dark_ribbon);
+            .render(ctx, glm::vec2(ctx.width - 256.0, 0.0), glm::vec2(256.0, ctx.height), &color_scheme.dark_ribbon);
 
         // Options Tabs
         for (i, button) in self.options_tab_buttons.iter_mut().enumerate() {
@@ -393,7 +394,7 @@ impl SelectionIndicator {
     }
 }
 
-pub fn find_tool<'a>(tools: &'a mut SlotMap<ToolKey, Tool>, kind: ToolKind) -> Option<&'a mut Tool> {
+pub fn find_tool(tools: &mut SlotMap<ToolKey, Tool>, kind: ToolKind) -> Option<&mut Tool> {
     for (tool_key, tool) in tools.iter() {
         if tool.kind() == kind {
             return Some(tools.get_mut(tool_key).unwrap());

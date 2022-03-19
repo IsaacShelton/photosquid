@@ -221,12 +221,10 @@ impl TextInput {
         );
     }
 
-    #[allow(unused)]
     pub fn is_focused(&self) -> bool {
         self.focused
     }
 
-    #[allow(unused)]
     pub fn set(&mut self, content: &str) {
         self.clear();
 

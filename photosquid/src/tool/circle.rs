@@ -2,7 +2,7 @@ use crate::{
     app::App,
     capture::Capture,
     interaction::{ClickInteraction, Interaction},
-    squid,
+    squid::Squid,
     user_input::UserInput,
 };
 use glium::glutin::event::MouseButton;
@@ -17,7 +17,7 @@ pub fn interact(user_inputs: &mut Vec<UserInput>, interaction: Interaction, app:
             let color = app.toolbox.color_picker.calculate_color();
             let radius = user_inputs[0].as_text_input_mut().unwrap().text().parse::<f32>().unwrap_or_default().max(4.0);
 
-            app.insert(Box::new(squid::Circle::new(world_position.x, world_position.y, radius, color)));
+            app.insert(Squid::circle(world_position, radius, color));
             Capture::AllowDrag
         }
         _ => Capture::Miss,

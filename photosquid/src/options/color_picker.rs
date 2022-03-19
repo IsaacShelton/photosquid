@@ -47,7 +47,7 @@ impl ColorPicker {
         self.color_changed_to.take()
     }
 
-    pub fn click(&mut self, button: MouseButton, mouse: &glm::Vec2, screen_width: f32) -> bool {
+    pub fn click(&mut self, button: MouseButton, mouse: glm::Vec2, screen_width: f32) -> bool {
         if button == MouseButton::Left && self.is_over_hue_value(mouse, screen_width) {
             self.is_selecting_hue_value = true;
             self.set_hue_value_with_mouse(mouse, screen_width);
@@ -67,9 +67,9 @@ impl ColorPicker {
         match interaction {
             Interaction::Drag(DragInteraction { current, .. }) => {
                 if self.is_selecting_hue_value {
-                    self.set_hue_value_with_mouse(current, screen_width);
+                    self.set_hue_value_with_mouse(*current, screen_width);
                 } else if self.is_selecting_saturation {
-                    self.set_saturation_with_mouse(current, screen_width);
+                    self.set_saturation_with_mouse(*current, screen_width);
                 }
                 Capture::AllowDrag
             }
@@ -84,7 +84,7 @@ impl ColorPicker {
         }
     }
 
-    pub fn is_over_hue_value(&self, mouse: &glm::Vec2, screen_width: f32) -> bool {
+    pub fn is_over_hue_value(&self, mouse: glm::Vec2, screen_width: f32) -> bool {
         if let Some(area) = self.get_hue_value_area(screen_width) {
             return area.intersecting_point(mouse.x, mouse.y);
         }
@@ -92,7 +92,7 @@ impl ColorPicker {
         false
     }
 
-    pub fn is_over_saturation(&self, mouse: &glm::Vec2, screen_width: f32) -> bool {
+    pub fn is_over_saturation(&self, mouse: glm::Vec2, screen_width: f32) -> bool {
         if let Some(area) = self.get_saturation_area(screen_width) {
             return area.intersecting_point(mouse.x, mouse.y);
         }
@@ -116,7 +116,7 @@ impl ColorPicker {
         &self.saturation_point
     }
 
-    pub fn set_hue_value_with_mouse(&mut self, mouse: &glm::Vec2, screen_width: f32) {
+    pub fn set_hue_value_with_mouse(&mut self, mouse: glm::Vec2, screen_width: f32) {
         if let Some(area) = self.get_hue_value_area(screen_width) {
             let u = (mouse.x - area.min_x) / area.width();
             let v = (mouse.y - area.min_y) / area.height();
@@ -127,7 +127,7 @@ impl ColorPicker {
         }
     }
 
-    pub fn set_saturation_with_mouse(&mut self, mouse: &glm::Vec2, screen_width: f32) {
+    pub fn set_saturation_with_mouse(&mut self, mouse: glm::Vec2, screen_width: f32) {
         if let Some(area) = self.get_saturation_area(screen_width) {
             let u = (mouse.x - area.min_x) / area.width();
             self.saturation_point.set(u.clamp(0.0, 1.0));

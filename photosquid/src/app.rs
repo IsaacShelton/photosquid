@@ -407,7 +407,7 @@ impl App {
         }
     }
 
-    pub fn insert(&mut self, value: Box<dyn Squid>) -> SquidRef {
+    pub fn insert(&mut self, value: Squid) -> SquidRef {
         self.prune_selection();
         self.ocean.insert(value)
     }

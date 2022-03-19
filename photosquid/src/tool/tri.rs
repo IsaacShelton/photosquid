@@ -2,7 +2,7 @@ use crate::{
     app::App,
     capture::Capture,
     interaction::{ClickInteraction, Interaction},
-    squid,
+    squid::Squid,
     user_input::UserInput,
 };
 use angular_units::Rad;
@@ -21,13 +21,13 @@ pub fn interact(user_inputs: &mut Vec<UserInput>, interaction: Interaction, app:
 
             let rotation = Rad(user_inputs[0].as_text_input_mut().unwrap().text().parse::<f32>().unwrap_or_default() * std::f32::consts::PI / 180.0);
 
-            app.insert(Box::new(squid::Tri::new(
+            app.insert(Squid::tri(
                 world_position + glm::vec2(0.0, -50.0),
                 world_position + glm::vec2(50.0, 50.0),
                 world_position + glm::vec2(-50.0, 50.0),
                 rotation,
                 color,
-            )));
+            ));
 
             Capture::AllowDrag
         }

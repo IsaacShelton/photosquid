@@ -45,3 +45,8 @@ pub fn angle_difference(alpha: Rad<f32>, beta: Rad<f32>) -> Rad<f32> {
 
     Rad(if difference < -PI { difference + TAU } else { difference })
 }
+
+pub fn get_point_delta_rotation(screen_position: &glm::Vec2, mouse_position: &glm::Vec2, old_rotation: Rad<f32>) -> Rad<f32> {
+    let new_rotation = Rad(-1.0 * (mouse_position.y - screen_position.y).atan2(mouse_position.x - screen_position.x));
+    angle_difference(old_rotation, new_rotation)
+}

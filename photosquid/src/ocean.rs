@@ -22,7 +22,7 @@ pub struct Ocean {
     pub layers: Vec<Layer>,
 
     #[deprecated]
-    pub squids: SlotMap<SquidRef, Box<dyn Squid>>,
+    pub squids: SlotMap<SquidRef, Squid>,
 }
 
 // Using #[allow(deprecated)] to silence warnings about manually accessing internal
@@ -42,7 +42,7 @@ impl Default for Ocean {
 // fields of 'Ocean' struct
 #[allow(deprecated)]
 impl Ocean {
-    pub fn insert(&mut self, value: Box<dyn Squid>) -> SquidRef {
+    pub fn insert(&mut self, value: Squid) -> SquidRef {
         let reference = self.squids.insert(value);
 
         self.force_valid_layer();
@@ -69,12 +69,12 @@ impl Ocean {
         self.squids.remove(reference);
     }
 
-    pub fn get(&self, reference: SquidRef) -> Option<UnsafeTemporary<&dyn Squid>> {
-        self.squids.get(reference).map(|x| &**x)
+    pub fn get(&self, reference: SquidRef) -> Option<UnsafeTemporary<&Squid>> {
+        self.squids.get(reference)
     }
 
-    pub fn get_mut(&mut self, reference: SquidRef) -> Option<UnsafeTemporary<&mut (dyn Squid + 'static)>> {
-        self.squids.get_mut(reference).map(|c| &mut **c)
+    pub fn get_mut(&mut self, reference: SquidRef) -> Option<UnsafeTemporary<&mut Squid>> {
+        self.squids.get_mut(reference)
     }
 
     pub fn get_layers(&self) -> &[Layer] {
@@ -82,7 +82,7 @@ impl Ocean {
     }
 
     // Tries to find a squid/squid-limb underneath a point to select
-    pub fn try_select(&mut self, underneath: &glm::Vec2, camera: &Camera, existing_selections: &[Selection]) -> TrySelectResult {
+    pub fn try_select(&mut self, underneath: glm::Vec2, camera: &Camera, existing_selections: &[Selection]) -> TrySelectResult {
         let highest_squids: Vec<SquidRef> = self.get_squids_highest().collect();
         let world_mouse = camera.apply_reverse(&underneath);
 
@@ -129,7 +129,7 @@ impl Ocean {
     }
 
     // Tries to get a context menu for a squid underneath a point
-    pub fn try_context_menu(&self, underneath: &glm::Vec2, camera: &Camera, color_scheme: &ColorScheme) -> Option<ContextMenu> {
+    pub fn try_context_menu(&self, underneath: glm::Vec2, camera: &Camera, color_scheme: &ColorScheme) -> Option<ContextMenu> {
         for self_reference in self.get_squids_highest() {
             if let Some(value) = self.get(self_reference) {
                 if let Some(new_context_menu) = value.try_context_menu(underneath, camera, self_reference, color_scheme) {

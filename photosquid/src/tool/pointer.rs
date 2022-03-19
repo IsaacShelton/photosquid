@@ -3,9 +3,10 @@ use crate::{
     bool_poll::BoolPoll,
     capture::{Capture, KeyCapture},
     interaction::{ClickInteraction, DragInteraction, Interaction, KeyInteraction},
+    math_helpers::get_point_delta_rotation,
     operation::Operation,
     selection::{NewSelection, TrySelectResult},
-    squid::{self, Initiation},
+    squid::Initiation,
     user_input::UserInput,
 };
 use angular_units::Rad;
@@ -19,7 +20,7 @@ pub fn interact(user_inputs: &mut Vec<UserInput>, interaction: Interaction, app:
         Interaction::Click(ClickInteraction { button, position, .. }) => {
             app.preclick();
 
-            let result = app.ocean.try_select(&position, &app.camera.get_animated(), &app.selections);
+            let result = app.ocean.try_select(position, &app.camera.get_animated(), &app.selections);
 
             // If we wouldn't be selecting anything new, prefer to interact
             // with existing selection over re-selecting/un-selecting
@@ -51,7 +52,7 @@ pub fn interact(user_inputs: &mut Vec<UserInput>, interaction: Interaction, app:
             }
 
             if button == MouseButton::Right {
-                app.context_menu = app.ocean.try_context_menu(&position, &app.camera.get_animated(), &app.color_scheme);
+                app.context_menu = app.ocean.try_context_menu(position, &app.camera.get_animated(), &app.color_scheme);
 
                 if app.context_menu.is_some() {
                     return Capture::NoDrag;
@@ -62,7 +63,7 @@ pub fn interact(user_inputs: &mut Vec<UserInput>, interaction: Interaction, app:
         }
         Interaction::Drag(DragInteraction { current: mouse_position, .. }) => match &mut app.operation {
             Some(Operation::Rotate { point, rotation }) => {
-                let delta_theta = squid::get_point_delta_rotation(point, &mouse_position, *rotation) - Rad::pi_over_2();
+                let delta_theta = get_point_delta_rotation(point, &mouse_position, *rotation) - Rad::pi_over_2();
                 *rotation += delta_theta;
                 Capture::RotateSelectedSquids { delta_theta }
             }
@@ -73,9 +74,15 @@ pub fn interact(user_inputs: &mut Vec<UserInput>, interaction: Interaction, app:
                 let total_scale_factor = df / d0;
                 Capture::ScaleSelectedSquids { total_scale_factor }
             }
-            Some(Operation::Spread { .. }) => Capture::SpreadSelectedSquids { current: mouse_position },
-            Some(Operation::Revolve { .. }) => Capture::RevolveSelectedSquids { current: mouse_position },
-            Some(Operation::Dilate { .. }) => Capture::DilateSelectedSquids { current: mouse_position },
+            Some(Operation::Spread { .. }) => Capture::SpreadSelectedSquids {
+                current: app.camera.get_animated().apply_reverse(&mouse_position),
+            },
+            Some(Operation::Revolve { .. }) => Capture::RevolveSelectedSquids {
+                current: app.camera.get_animated().apply_reverse(&mouse_position),
+            },
+            Some(Operation::Dilate { .. }) => Capture::DilateSelectedSquids {
+                current: app.camera.get_animated().apply_reverse(&mouse_position),
+            },
             None => {
                 app.try_interact_with_selections(&interaction)?;
                 Capture::AllowDrag

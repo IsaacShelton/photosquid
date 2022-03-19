@@ -2,11 +2,12 @@ use crate::{
     app::App,
     capture::Capture,
     interaction::{ClickInteraction, Interaction},
-    squid,
+    squid::Squid,
     user_input::UserInput,
 };
 use angular_units::Rad;
 use glium::glutin::event::MouseButton;
+use nalgebra_glm as glm;
 
 pub fn interact(user_inputs: &mut Vec<UserInput>, interaction: Interaction, app: &mut App) -> Capture {
     match interaction {
@@ -22,16 +23,7 @@ pub fn interact(user_inputs: &mut Vec<UserInput>, interaction: Interaction, app:
             let rotation = Rad(user_inputs[2].as_text_input_mut().unwrap().text().parse::<f32>().unwrap_or_default() * std::f32::consts::PI / 180.0);
             let radii = user_inputs[3].as_text_input_mut().unwrap().text().parse::<f32>().unwrap_or_default();
 
-            app.insert(Box::new(squid::Rect::new(
-                world_position.x,
-                world_position.y,
-                width,
-                height,
-                rotation,
-                color,
-                radii,
-            )));
-
+            app.insert(Squid::rect(world_position, glm::vec2(width, height), rotation, color, radii));
             Capture::AllowDrag
         }
         _ => Capture::Miss,

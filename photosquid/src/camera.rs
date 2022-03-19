@@ -1,6 +1,11 @@
 use crate::smooth::{Lerpable, Smooth};
+use lazy_static::lazy_static;
 use more_asserts::assert_le;
 use nalgebra_glm as glm;
+
+lazy_static! {
+    pub static ref IDENTITY_CAMERA: Camera = Camera::identity(glm::zero());
+}
 
 #[derive(Copy, Clone)]
 pub struct Camera {
@@ -72,7 +77,7 @@ impl Camera {
     pub fn with_zoom(&self, zoom: f32) -> Camera {
         Camera {
             position: self.position,
-            zoom: zoom,
+            zoom,
             window: self.window,
         }
     }

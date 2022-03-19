@@ -317,13 +317,23 @@ fn render_app<'f>(
 
     ctx.clear_color(&app.color_scheme.background);
 
-    for reference in &app.ocean.get_squids_lowest().collect::<Vec<_>>() {
-        if let Some(squid) = app.ocean.get_mut(*reference) {
-            squid.render(&mut ctx, None);
+    // Render squids and their selection points
+    {
+        let ctx = &mut ctx;
+        let mut all_selection_points: Vec<glm::Vec2> = vec![];
 
-            if selection_contains(&app.selections, *reference) {
-                squid.render_selected_indication(&mut ctx);
+        for reference in &app.ocean.get_squids_lowest().collect::<Vec<_>>() {
+            if let Some(squid) = app.ocean.get_mut(*reference) {
+                squid.render(ctx, None);
+
+                if selection_contains(&app.selections, *reference) {
+                    squid.get_selection_points(ctx.camera, &mut all_selection_points);
+                }
             }
+        }
+
+        for point in all_selection_points {
+            ctx.ring_mesh.render(ctx, point, *squid::HANDLE_SIZE, &ctx.color_scheme.foreground);
         }
     }
 
@@ -373,7 +383,7 @@ fn render_television(target: &mut glium::Frame, rendered: &glium::texture::SrgbT
 fn do_click_context_menu(app: &mut App, button: MouseButton, mouse_position: &glm::Vec2) -> Capture {
     if let Some(context_menu) = &app.context_menu {
         // Get context menu action
-        let action = context_menu.click(button, &mouse_position);
+        let action = context_menu.click(button, mouse_position);
 
         // Destroy context menu
         app.context_menu = None;

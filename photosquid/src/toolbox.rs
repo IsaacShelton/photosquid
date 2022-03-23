@@ -55,6 +55,13 @@ impl ToolBox {
         // Create tools and corresponding tool buttons
 
         self.add_tool_button(ToolButton::new(
+            include_str!("_src_objs/hamburger.obj"),
+            PressAnimation::Scale,
+            tools.insert(Tool::main_menu()),
+            display,
+        ));
+
+        self.add_tool_button(ToolButton::new(
             include_str!("_src_objs/pointer.obj"),
             PressAnimation::Deform,
             tools.insert(Tool::pointer()),
@@ -89,8 +96,8 @@ impl ToolBox {
             display,
         ));
 
-        // Select first tool
-        self.select_tool(0);
+        // Select first non-menu tool
+        self.select_tool(1);
     }
 
     pub fn create_standard_options_tabs(&mut self, tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>, display: &Display) {

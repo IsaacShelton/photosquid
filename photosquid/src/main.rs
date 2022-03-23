@@ -13,6 +13,7 @@ mod algorithm;
 mod annotations;
 mod app;
 mod bool_poll;
+mod button;
 mod camera;
 mod capture;
 mod checkbox;

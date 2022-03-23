@@ -162,16 +162,16 @@ impl App {
         }
 
         match key {
-            VirtualKeyCode::Key1 => self.toolbox.select_tool(0),
-            VirtualKeyCode::Key2 => self.toolbox.select_tool(1),
-            VirtualKeyCode::Key3 => self.toolbox.select_tool(2),
-            VirtualKeyCode::Key4 => self.toolbox.select_tool(3),
-            VirtualKeyCode::Key5 => self.toolbox.select_tool(4),
-            VirtualKeyCode::Key6 => self.toolbox.select_tool(5),
-            VirtualKeyCode::Key7 => self.toolbox.select_tool(6),
-            VirtualKeyCode::Key8 => self.toolbox.select_tool(7),
-            VirtualKeyCode::Key9 => self.toolbox.select_tool(8),
-            VirtualKeyCode::Key0 => self.toolbox.select_tool(9),
+            VirtualKeyCode::Key1 => self.toolbox.select_tool(1),
+            VirtualKeyCode::Key2 => self.toolbox.select_tool(2),
+            VirtualKeyCode::Key3 => self.toolbox.select_tool(3),
+            VirtualKeyCode::Key4 => self.toolbox.select_tool(4),
+            VirtualKeyCode::Key5 => self.toolbox.select_tool(5),
+            VirtualKeyCode::Key6 => self.toolbox.select_tool(6),
+            VirtualKeyCode::Key7 => self.toolbox.select_tool(7),
+            VirtualKeyCode::Key8 => self.toolbox.select_tool(8),
+            VirtualKeyCode::Key9 => self.toolbox.select_tool(9),
+            VirtualKeyCode::Key0 => self.toolbox.select_tool(0),
             VirtualKeyCode::X => self.delete_selected(),
             VirtualKeyCode::Escape => self.context_menu = None,
             VirtualKeyCode::D => {

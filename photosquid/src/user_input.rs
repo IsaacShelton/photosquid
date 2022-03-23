@@ -1,5 +1,6 @@
 use crate::{
     aabb::AABB,
+    button::Button,
     capture::{Capture, KeyCapture},
     checkbox::Checkbox,
     render_ctx::RenderCtx,
@@ -18,13 +19,16 @@ pub enum UserInput {
 
     #[allow(dead_code)]
     Checkbox(Checkbox),
+
+    Button(Button),
 }
 
 impl UserInput {
-    pub fn click(&mut self, button: MouseButton, position: &glm::Vec2, area: &AABB) -> Capture {
+    pub fn click(&mut self, mouse_button: MouseButton, position: &glm::Vec2, area: &AABB) -> Capture {
         match self {
-            Self::TextInput(text_input) => text_input.click(button, position, area),
-            Self::Checkbox(checkbox) => checkbox.click(button, position, area),
+            Self::TextInput(text_input) => text_input.click(mouse_button, position, area),
+            Self::Checkbox(checkbox) => checkbox.click(mouse_button, position, area),
+            Self::Button(button) => button.click(mouse_button, position, area),
         }
     }
 
@@ -32,6 +36,7 @@ impl UserInput {
         match self {
             Self::TextInput(text_input) => text_input.key_press(virtual_keycode, shift),
             Self::Checkbox(..) => KeyCapture::Miss,
+            Self::Button(..) => KeyCapture::Miss,
         }
     }
 
@@ -39,6 +44,7 @@ impl UserInput {
         match self {
             Self::TextInput(text_input) => text_input.render(ctx, text_system, font, area),
             Self::Checkbox(checkbox) => checkbox.render(ctx, text_system, font, area),
+            Self::Button(button) => button.render(ctx, text_system, font, area),
         }
     }
 
@@ -46,6 +52,7 @@ impl UserInput {
         match self {
             Self::TextInput(text_input) => text_input.unfocus(),
             Self::Checkbox(..) => (),
+            Self::Button(..) => (),
         }
     }
 }

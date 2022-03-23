@@ -7,6 +7,7 @@ mod tri;
 use crate::{
     aabb::AABB,
     app::App,
+    button::Button,
     camera::EasySmoothCamera,
     capture::{Capture, KeyCapture},
     interaction::{ClickInteraction, Interaction, KeyInteraction},
@@ -25,6 +26,7 @@ new_key_type! { pub struct ToolKey; }
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum ToolKind {
+    MainMenu,
     Circle,
     Pan,
     Pointer,
@@ -38,6 +40,19 @@ pub struct Tool {
 }
 
 impl Tool {
+    pub fn main_menu() -> Self {
+        Self {
+            kind: ToolKind::MainMenu,
+            user_inputs: vec![
+                UserInput::Button(Button::new("Open".to_string())),
+                UserInput::Button(Button::new("Save".to_string())),
+                UserInput::Button(Button::new("Save As".to_string())),
+                UserInput::Button(Button::new("Export".to_string())),
+                UserInput::Button(Button::new("About".to_string())),
+            ],
+        }
+    }
+
     pub fn circle() -> Self {
         Self {
             kind: ToolKind::Circle,
@@ -86,6 +101,7 @@ impl Tool {
 
     pub fn interact(&mut self, interaction: Interaction, app: &mut App) -> Capture {
         match self.kind {
+            ToolKind::MainMenu => Capture::Miss,
             ToolKind::Circle => circle::interact(&mut self.user_inputs, interaction, app),
             ToolKind::Pan => pan::interact(&mut self.user_inputs, interaction, app),
             ToolKind::Pointer => pointer::interact(&mut self.user_inputs, interaction, app),

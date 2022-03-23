@@ -15,22 +15,22 @@ pub enum PressAnimation {
 
     #[allow(dead_code)]
     Fall,
+
+    #[allow(dead_code)]
+    Scale,
 }
 
 impl PressAnimation {
     pub fn at_time(&self, focus: bool, t: f32) -> AnimationMoment {
+        use std::f32::consts::{FRAC_PI_2, PI};
+
         match self {
             Self::None => Default::default(),
             Self::Deform => {
                 if focus {
                     AnimationMoment {
                         relative_scale: if t < 0.5 { (2.0 * t).exponential_out() } else { 1.0 },
-                        rotation: Rad(0.25
-                            * if t < 0.5 {
-                                (std::f32::consts::FRAC_PI_2 * -2.0 * (1.0 - t * 2.0)).sin()
-                            } else {
-                                0.0
-                            }),
+                        rotation: Rad(0.25 * if t < 0.5 { (FRAC_PI_2 * -2.0 * (1.0 - t * 2.0)).sin() } else { 0.0 }),
                         ..Default::default()
                     }
                 } else {
@@ -50,11 +50,7 @@ impl PressAnimation {
             Self::HalfCycle => {
                 if focus {
                     AnimationMoment {
-                        rotation: Rad(if t < 0.5 {
-                            (2.0 * t).exponential_out() * std::f32::consts::PI + std::f32::consts::PI
-                        } else {
-                            0.0
-                        }),
+                        rotation: Rad(if t < 0.5 { (2.0 * t).exponential_out() * PI + PI } else { 0.0 }),
                         ..Default::default()
                     }
                 } else {
@@ -65,6 +61,16 @@ impl PressAnimation {
                 backwards_rotation: Rad(if focus { t.bounce_out() } else { 1.0 - t.exponential_out() }),
                 ..Default::default()
             },
+            Self::Scale => {
+                if focus {
+                    AnimationMoment {
+                        relative_scale: if t < 0.5 { (2.0 * t).exponential_out() } else { 1.0 },
+                        ..Default::default()
+                    }
+                } else {
+                    Default::default()
+                }
+            }
         }
     }
 }

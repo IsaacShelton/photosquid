@@ -16,7 +16,6 @@ pub enum PressAnimation {
     #[allow(dead_code)]
     Fall,
 
-    #[allow(dead_code)]
     Scale,
 }
 

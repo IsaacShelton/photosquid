@@ -1,10 +1,15 @@
+mod button;
+mod checkbox;
+mod text_input;
+
+pub use button::Button;
+pub use checkbox::Checkbox;
+pub use text_input::TextInput;
+
 use crate::{
     aabb::AABB,
-    button::Button,
     capture::{Capture, KeyCapture},
-    checkbox::Checkbox,
     render_ctx::RenderCtx,
-    text_input::TextInput,
 };
 use enum_as_inner::EnumAsInner;
 use glium::glutin::event::{MouseButton, VirtualKeyCode};

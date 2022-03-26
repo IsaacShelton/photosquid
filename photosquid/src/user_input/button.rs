@@ -33,14 +33,13 @@ impl Button {
     fn render_box(&self, ctx: &mut RenderCtx, area: &AABB) {
         let mesh = ctx.square_xyzuv;
         let identity = glm::identity::<f32, 4>();
+
         let quad_dimensions = glm::vec2(area.width(), area.height() + 32.0);
         let dead_space = quad_dimensions - glm::vec2(area.width(), area.height());
-        let transformation = glm::translation(&glm::vec3(
-            area.min_x + quad_dimensions.x * 0.5 - dead_space.x * 0.5,
-            area.min_y + quad_dimensions.y * 0.5 - dead_space.y * 0.5,
-            0.0,
-        ));
-        let transformation = glm::scale(&transformation, &glm::vec3(quad_dimensions.x * 0.5, quad_dimensions.y * 0.5, 0.0));
+        let min = glm::vec2(area.min_x, area.min_y);
+
+        let transformation = glm::translation(&glm::vec2_to_vec3(&(min + quad_dimensions * 0.5 - dead_space * 0.5)));
+        let transformation = glm::scale(&transformation, &glm::vec2_to_vec3(&(quad_dimensions * 0.5)));
 
         let uniforms = glium::uniform! {
             transformation: reach_inside_mat4(&transformation),

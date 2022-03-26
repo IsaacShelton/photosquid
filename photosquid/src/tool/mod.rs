@@ -7,13 +7,11 @@ mod tri;
 use crate::{
     aabb::AABB,
     app::App,
-    button::Button,
     camera::EasySmoothCamera,
     capture::{Capture, KeyCapture},
     interaction::{ClickInteraction, Interaction, KeyInteraction},
     render_ctx::RenderCtx,
-    text_input::TextInput,
-    user_input::UserInput,
+    user_input::{Button, TextInput, UserInput},
 };
 use glium::glutin::event::VirtualKeyCode;
 use glium_text_rusttype::{FontTexture, TextSystem};

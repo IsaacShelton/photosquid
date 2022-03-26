@@ -64,11 +64,10 @@ impl Checkbox {
             self.color = Some(Smooth::new(ctx.color_scheme.light_ribbon, Duration::from_millis(200)));
         }
 
-        if self.checkmark.is_none() {
-            self.checkmark = Some(IconButton::new(include_str!("_src_objs/check.obj"), PressAnimation::HalfCycle, (), ctx.display));
-        }
+        let checkmark = self
+            .checkmark
+            .get_or_insert_with(|| IconButton::new(include_str!("../_src_objs/check.obj"), PressAnimation::HalfCycle, (), ctx.display));
 
-        let checkmark = self.checkmark.as_mut().unwrap();
         let checked_color = Color::from_hex("#999999");
         let unchecked_color = ctx.color_scheme.light_ribbon;
 

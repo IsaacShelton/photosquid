@@ -34,6 +34,7 @@ mod ocean;
 mod operation;
 mod options;
 mod press_animation;
+mod raster_color;
 mod render_ctx;
 mod selection;
 mod shader_helpers;

@@ -8,7 +8,6 @@ edition = "2018"
 [dependencies]
 glium = "0.*"
 nalgebra-glm = "0.15"
-raster = "0.2"
 tobj = "3.2"
 stringreader = "0.1"
 interpolation = "0.2"

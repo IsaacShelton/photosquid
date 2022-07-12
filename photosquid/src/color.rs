@@ -1,9 +1,11 @@
+use crate::raster_color::RasterColor;
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Color {
-    r: f32,
-    g: f32,
-    b: f32,
-    a: f32,
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
 }
 
 impl Color {
@@ -12,13 +14,7 @@ impl Color {
     }
 
     pub fn from_hex(hex: &str) -> Self {
-        let raster_color = raster::Color::hex(hex).unwrap_or_else(|_| raster::Color::black());
-        Self {
-            r: raster_color.r as f32 / 255.0,
-            g: raster_color.g as f32 / 255.0,
-            b: raster_color.b as f32 / 255.0,
-            a: raster_color.a as f32 / 255.0,
-        }
+        RasterColor::hex(hex).unwrap_or_else(|_| RasterColor::new(0, 0, 0, 0)).into()
     }
 
     // Creates a 'Color' from hue, saturation, and value parameters
@@ -95,5 +91,16 @@ impl From<&Color> for [u8; 4] {
             (color.b * 255.0) as u8,
             (color.a * 255.0) as u8,
         ]
+    }
+}
+
+impl From<RasterColor> for Color {
+    fn from(c: RasterColor) -> Self {
+        Self {
+            r: c.r as f32 / 255.0,
+            g: c.g as f32 / 255.0,
+            b: c.b as f32 / 255.0,
+            a: c.a as f32 / 255.0,
+        }
     }
 }

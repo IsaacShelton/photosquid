@@ -42,11 +42,41 @@ impl Tool {
         Self {
             kind: ToolKind::MainMenu,
             user_inputs: vec![
-                UserInput::Button(Button::new("Open".to_string())),
-                UserInput::Button(Button::new("Save".to_string())),
-                UserInput::Button(Button::new("Save As".to_string())),
-                UserInput::Button(Button::new("Export".to_string())),
-                UserInput::Button(Button::new("About".to_string())),
+                UserInput::Button(Button::new(
+                    "Open".to_string(),
+                    Box::new(|_| {
+                        // @todo
+                        println!("Open!");
+                    }),
+                )),
+                UserInput::Button(Button::new(
+                    "Save".to_string(),
+                    Box::new(|_| {
+                        // @todo
+                        println!("Save!");
+                    }),
+                )),
+                UserInput::Button(Button::new(
+                    "Save As".to_string(),
+                    Box::new(|_| {
+                        // @todo
+                        println!("Save As!");
+                    }),
+                )),
+                UserInput::Button(Button::new(
+                    "Export".to_string(),
+                    Box::new(|_| {
+                        // @todo
+                        println!("Export!");
+                    }),
+                )),
+                UserInput::Button(Button::new(
+                    "About".to_string(),
+                    Box::new(|_| {
+                        // @todo
+                        println!("About!");
+                    }),
+                )),
             ],
         }
     }
@@ -138,7 +168,7 @@ impl Tool {
         match interaction {
             Interaction::Click(ClickInteraction { button, position }) => {
                 let index_took_focus = self.user_inputs.iter_mut().enumerate().find_map(|(i, user_input)| {
-                    if user_input.click(button, &position, &get_nth_input_area(i)) == Capture::TakeFocus {
+                    if user_input.click(button, &position, &get_nth_input_area(i), app) == Capture::TakeFocus {
                         Some(i)
                     } else {
                         None

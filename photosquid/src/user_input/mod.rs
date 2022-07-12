@@ -8,6 +8,7 @@ pub use text_input::TextInput;
 
 use crate::{
     aabb::AABB,
+    app::App,
     capture::{Capture, KeyCapture},
     render_ctx::RenderCtx,
 };
@@ -29,11 +30,11 @@ pub enum UserInput {
 }
 
 impl UserInput {
-    pub fn click(&mut self, mouse_button: MouseButton, position: &glm::Vec2, area: &AABB) -> Capture {
+    pub fn click(&mut self, mouse_button: MouseButton, position: &glm::Vec2, area: &AABB, app: &mut App) -> Capture {
         match self {
             Self::TextInput(text_input) => text_input.click(mouse_button, position, area),
             Self::Checkbox(checkbox) => checkbox.click(mouse_button, position, area),
-            Self::Button(button) => button.click(mouse_button, position, area),
+            Self::Button(button) => button.click(mouse_button, position, area, app),
         }
     }
 

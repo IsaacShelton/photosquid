@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use super::Lerpable;
 
-#[derive(Copy, Clone)]
+#[derive(Default, Copy, Clone, Serialize, Deserialize)]
 pub struct NoLerp<T: Lerpable + Copy>(pub T);
 
 impl<T: Lerpable + Copy> Lerpable for NoLerp<T> {

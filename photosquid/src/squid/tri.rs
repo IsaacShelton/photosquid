@@ -3,80 +3,75 @@ use crate::{
     algorithm::{get_distance_between_point_and_triangle, get_triangle_center, is_point_inside_triangle},
     camera::Camera,
     capture::Capture,
-    color::Color,
+    data::TriData,
     interaction::{ClickInteraction, DragInteraction, Interaction, MouseReleaseInteraction},
     math_helpers::DivOrZero,
     matrix_helpers,
     mesh::MeshXyz,
     render_ctx::RenderCtx,
-    smooth::{Lerpable, MultiLerp, NoLerp, Smooth},
+    smooth::{MultiLerp, Smooth},
 };
 use angular_units::{Angle, Rad};
 use glium::{glutin::event::MouseButton, Display};
 use nalgebra_glm as glm;
+use serde::{Deserialize, Serialize};
 
 use super::{
     behavior::{self, DilateBehavior, RevolveBehavior, SpreadBehavior, TranslateBehavior},
     PreviewParams, HANDLE_RADIUS,
 };
 
+#[derive(Serialize, Deserialize)]
 pub struct Tri {
+    #[serde(skip)]
     pub mesh: Option<MeshXyz>,
+
     pub data: Smooth<TriData>,
 
     // Keep track of which points the mesh is made of,
     // so that we know when we have to re-create it
+    #[serde(skip)]
     pub mesh_p1: glm::Vec2,
+
+    #[serde(skip)]
     pub mesh_p2: glm::Vec2,
+
+    #[serde(skip)]
     pub mesh_p3: glm::Vec2,
 
     // Move point
+    #[serde(skip)]
     pub moving_point: Option<usize>, // (zero indexed)
 
     // Translate
+    #[serde(skip)]
     pub translate_behavior: TranslateBehavior,
 
     // Rotate
+    #[serde(skip)]
     pub rotating: bool,
+
+    #[serde(skip)]
     pub rotation_accumulator: Accumulator<Rad<f32>>,
+
+    #[serde(skip)]
     pub virtual_rotation: Rad<f32>, // Rotation that only applies to the handle
 
     // Scale
+    #[serde(skip)]
     pub prescale_size: [glm::Vec2; 3],
 
     // Spread
+    #[serde(skip)]
     pub spread_behavior: SpreadBehavior,
 
     // Revolve
+    #[serde(skip)]
     pub revolve_behavior: RevolveBehavior,
 
     // Dilate
+    #[serde(skip)]
     pub dilate_behavior: DilateBehavior,
-}
-
-#[derive(Copy, Clone)]
-pub struct TriData {
-    pub p1: MultiLerp<glm::Vec2>,
-    pub p2: MultiLerp<glm::Vec2>,
-    pub p3: MultiLerp<glm::Vec2>,
-    pub position: MultiLerp<glm::Vec2>,
-    pub color: NoLerp<Color>,
-    pub rotation: Rad<f32>,
-}
-
-impl Lerpable for TriData {
-    type Scalar = f32;
-
-    fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
-        Self {
-            p1: Lerpable::lerp(&self.p1, &other.p1, scalar),
-            p2: Lerpable::lerp(&self.p2, &other.p2, scalar),
-            p3: Lerpable::lerp(&self.p3, &other.p3, scalar),
-            position: self.position.lerp(&other.position, scalar),
-            rotation: angular_units::Interpolate::interpolate(&self.rotation, &other.rotation, *scalar),
-            color: Lerpable::lerp(&self.color, &other.color, scalar),
-        }
-    }
 }
 
 pub fn render(tri: &mut Tri, ctx: &mut RenderCtx, as_preview: Option<PreviewParams>) {

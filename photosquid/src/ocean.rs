@@ -8,12 +8,13 @@ use crate::{
     squid::{self, Squid, SquidRef},
 };
 use nalgebra_glm as glm;
+use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
 
 // A world that objects (aka squids) live in
 // NOTE: Only use direct access if you know what you're doing
 // Use #[allow(deprecated)] to silence warnings when using internal fields
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Ocean {
     #[deprecated]
     pub current_layer: usize,

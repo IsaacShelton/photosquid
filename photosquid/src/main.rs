@@ -12,6 +12,7 @@ mod accumulator;
 mod algorithm;
 mod annotations;
 mod app;
+mod approx_instant;
 mod bool_poll;
 mod camera;
 mod capture;
@@ -19,6 +20,7 @@ mod color;
 mod color_impls;
 mod color_scheme;
 mod context_menu;
+mod data;
 mod dragging;
 mod history;
 mod icon_button;
@@ -168,6 +170,7 @@ fn main() {
         wait_for_stop_drag: false,
         operation: None,
         perform_next_operation_collectively: false,
+        saved: "".into(),
     };
 
     event_loop.run(move |abstract_event, _, control_flow| {

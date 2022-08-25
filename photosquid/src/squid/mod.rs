@@ -3,14 +3,17 @@ mod circle;
 mod rect;
 mod tri;
 
+use self::behavior::{DilateBehavior, SpreadBehavior, TranslateBehavior};
 use crate::{
     accumulator::Accumulator,
     algorithm::get_triangle_center,
+    approx_instant,
     camera::{Camera, IDENTITY_CAMERA},
     capture::Capture,
     color::Color,
     color_scheme::ColorScheme,
     context_menu::{ContextAction, ContextMenu, ContextMenuOption},
+    data::{CircleData, RectData, TriData},
     interaction::Interaction,
     interaction_options::InteractionOptions,
     render_ctx::RenderCtx,
@@ -22,6 +25,7 @@ use circle::Circle;
 use lazy_static::lazy_static;
 use nalgebra_glm as glm;
 use rect::Rect;
+use serde::{Deserialize, Serialize};
 use slotmap::new_key_type;
 use std::{
     cmp::Ordering,
@@ -29,27 +33,25 @@ use std::{
 };
 use tri::Tri;
 
-use self::{
-    behavior::{DilateBehavior, SpreadBehavior, TranslateBehavior},
-    circle::CircleData,
-    rect::RectData,
-    tri::TriData,
-};
-
 new_key_type! {
     pub struct SquidRef;
     pub struct SquidLimbRef;
 }
 
+#[derive(Serialize, Deserialize)]
 enum SquidData {
     Rect(Rect),
     Circle(Circle),
     Tri(Tri),
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Squid {
     name: Option<String>,
+
+    #[serde(with = "approx_instant")]
     created: Instant,
+
     data: SquidData,
 }
 

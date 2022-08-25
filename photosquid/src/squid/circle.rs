@@ -6,63 +6,53 @@ use crate::{
     accumulator::Accumulator,
     camera::Camera,
     capture::Capture,
-    color::Color,
+    data::CircleData,
     interaction::{ClickInteraction, DragInteraction, Interaction, MouseReleaseInteraction},
     math_helpers::angle_difference,
     matrix_helpers,
     mesh::MeshXyz,
     render_ctx::RenderCtx,
-    smooth::{Lerpable, MultiLerp, NoLerp, Smooth},
+    smooth::Smooth,
 };
 use angular_units::{Angle, Rad};
 use glium::glutin::event::MouseButton;
 use nalgebra_glm as glm;
+use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
 pub struct Circle {
+    #[serde(skip)]
     pub mesh: Option<MeshXyz>,
+
     pub data: Smooth<CircleData>,
 
     // Translate
+    #[serde(skip)]
     pub translate_behavior: TranslateBehavior,
 
     // Virtual Rotate
+    #[serde(skip)]
     pub rotation_accumulator: Accumulator<Rad<f32>>,
 
     // Scale
+    #[serde(skip)]
     pub prescale_size: f32,
 
     // Scale and Virtual Rotate
+    #[serde(skip)]
     pub scale_rotating: bool,
 
     // Spread
+    #[serde(skip)]
     pub spread_behavior: SpreadBehavior,
 
     // Revolve
+    #[serde(skip)]
     pub revolve_behavior: RevolveBehavior,
 
     // Dilate
+    #[serde(skip)]
     pub dilate_behavior: DilateBehavior,
-}
-
-#[derive(Copy, Clone)]
-pub struct CircleData {
-    pub position: MultiLerp<glm::Vec2>,
-    pub radius: f32,
-    pub color: NoLerp<Color>,
-    pub virtual_rotation: Rad<f32>,
-}
-
-impl Lerpable for CircleData {
-    type Scalar = f32;
-
-    fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
-        Self {
-            position: Lerpable::lerp(&self.position, &other.position, scalar),
-            radius: interpolation::Lerp::lerp(&self.radius, &other.radius, scalar),
-            color: Lerpable::lerp(&self.color, &other.color, scalar),
-            virtual_rotation: angular_units::Interpolate::interpolate(&self.virtual_rotation, &other.virtual_rotation, *scalar),
-        }
-    }
 }
 
 pub fn render(circle: &mut Circle, ctx: &mut RenderCtx, as_preview: Option<PreviewParams>) {

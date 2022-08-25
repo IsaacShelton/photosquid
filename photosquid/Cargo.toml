@@ -7,20 +7,22 @@ edition = "2018"
 
 [dependencies]
 glium = "0.*"
-nalgebra-glm = "0.15"
+nalgebra-glm = { version = "0.15", features = ["serde-serialize"] }
 tobj = "3.2"
 stringreader = "0.1"
 interpolation = "0.2"
-slotmap = "1.0"
+slotmap = { version = "1.0", features = ["serde"] }
 palette = "0.6"
 glium_text_rusttype = { path = "../glium_text_rusttype" }
 rand = "0.7"
 enum-as-inner = "0.3"
-angular-units = "0.2"
+angular-units = { version = "0.2", features = ["serde"] }
 lyon="0.17"
 more-asserts="0.2"
 lazy_static = "1.4"
+derive_deref = "1.1.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
-# serde = { version = "1.0", features = ["derive"] }
 # bincode = "1.2.1"
 # approx = "0.5.0"

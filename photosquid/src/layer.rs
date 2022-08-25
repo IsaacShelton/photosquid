@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use crate::squid::SquidRef;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Layer {
     pub name: String,
     pub squids: Vec<SquidRef>,

@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use crate::raster_color::RasterColor;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Default, Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Color {
     pub r: f32,
     pub g: f32,

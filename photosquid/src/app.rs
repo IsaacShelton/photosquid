@@ -64,6 +64,7 @@ pub struct App {
     pub wait_for_stop_drag: bool,
     pub operation: Option<Operation>,
     pub perform_next_operation_collectively: bool,
+    pub saved: String,
 }
 
 trait ControlOrCommand {
@@ -147,6 +148,18 @@ impl App {
         if self.modifiers_held.control_or_command() && key == VirtualKeyCode::Minus {
             self.camera.decrease_zoom();
             return;
+        }
+
+        // Experimental save
+        if key == VirtualKeyCode::F1 {
+            let saved = serde_json::to_string(&self.ocean).unwrap();
+            println!("{}", saved);
+            self.saved = saved;
+        }
+
+        // Experimental load
+        if key == VirtualKeyCode::F2 {
+            self.ocean = serde_json::from_str(&self.saved).unwrap();
         }
 
         if let Some(tool_key) = self.toolbox.get_selected() {

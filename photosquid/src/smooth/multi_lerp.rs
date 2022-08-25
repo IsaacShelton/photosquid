@@ -1,7 +1,8 @@
 use super::{CircleLerpable, Lerpable};
 use enum_as_inner::EnumAsInner;
+use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, EnumAsInner)]
+#[derive(Copy, Clone, EnumAsInner, Serialize, Deserialize)]
 pub enum MultiLerp<T: Lerpable + CircleLerpable + Copy + Clone> {
     From(T),
     Linear(T),
@@ -27,5 +28,11 @@ impl<T: Lerpable<Scalar = f32> + CircleLerpable<Scalar = f32> + Copy + Clone> Le
             Self::Linear(value) => self.reveal().lerp(value, scalar),
             Self::Circle(value, origin) => CircleLerpable::circle_lerp(&self.reveal(), value, origin, scalar),
         })
+    }
+}
+
+impl<T: Lerpable + CircleLerpable + Copy + Default> Default for MultiLerp<T> {
+    fn default() -> Self {
+        Self::Linear(T::default())
     }
 }

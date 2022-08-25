@@ -7,66 +7,56 @@ use crate::{
     algorithm,
     camera::Camera,
     capture::Capture,
-    color::Color,
+    data::RectData,
     interaction::{ClickInteraction, DragInteraction, Interaction, MouseReleaseInteraction},
     math_helpers::DivOrZero,
     matrix_helpers,
     mesh::MeshXyz,
     render_ctx::RenderCtx,
-    smooth::{Lerpable, MultiLerp, NoLerp, Smooth},
+    smooth::Smooth,
 };
 use angular_units::{Angle, Rad};
 use glium::glutin::event::MouseButton;
 use nalgebra_glm as glm;
+use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
 pub struct Rect {
+    #[serde(skip)]
     pub mesh: Option<MeshXyz>,
+
     pub data: Smooth<RectData>,
 
     // Move point
+    #[serde(skip)]
     pub moving_corner: Option<Corner>,
 
     // Translate
+    #[serde(skip)]
     pub translate_behavior: TranslateBehavior,
 
     // Rotate
+    #[serde(skip)]
     pub rotating: bool,
+
+    #[serde(skip)]
     pub rotation_accumulator: Accumulator<Rad<f32>>,
 
     // Scale
+    #[serde(skip)]
     pub prescale_size: glm::Vec2,
 
     // Spread
+    #[serde(skip)]
     pub spread_behavior: SpreadBehavior,
 
     // Revolve
+    #[serde(skip)]
     pub revolve_behavior: RevolveBehavior,
 
     // Dilate
+    #[serde(skip)]
     pub dilate_behavior: DilateBehavior,
-}
-
-#[derive(Copy, Clone)]
-pub struct RectData {
-    pub position: MultiLerp<glm::Vec2>,
-    pub size: glm::Vec2,
-    pub color: NoLerp<Color>,
-    pub rotation: Rad<f32>,
-    pub radii: f32,
-}
-
-impl Lerpable for RectData {
-    type Scalar = f32;
-
-    fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
-        Self {
-            position: self.position.lerp(&other.position, scalar),
-            size: Lerpable::lerp(&self.size, &other.size, scalar),
-            rotation: angular_units::Interpolate::interpolate(&self.rotation, &other.rotation, *scalar),
-            color: Lerpable::lerp(&self.color, &other.color, scalar),
-            radii: interpolation::Lerp::lerp(&self.radii, &other.radii, scalar),
-        }
-    }
 }
 
 #[derive(Copy, Clone)]

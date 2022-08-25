@@ -1,11 +1,19 @@
 use super::Lerpable;
 use interpolation::Ease;
+use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
+#[derive(Serialize, Deserialize)]
 pub struct Smooth<T: Lerpable + Copy> {
     data: T,
+
+    #[serde(skip)]
     previous: T,
+
+    #[serde(skip, default = "Instant::now")]
     changed: Instant,
+
+    #[serde(skip)]
     duration: Duration,
 }
 

@@ -157,7 +157,7 @@ fn main() {
         projection: None,
         view: None,
         frame_start_time: Instant::now(),
-        camera: Smooth::new(Camera::identity(initial_dimensions), Duration::from_millis(500)),
+        camera: Smooth::new(Camera::identity(initial_dimensions), None),
         dragging: None,
         selections: vec![],
         keys_held: BTreeSet::new(),

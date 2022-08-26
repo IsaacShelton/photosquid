@@ -237,7 +237,7 @@ pub fn render(rect: &mut Rect, ctx: &mut RenderCtx, as_preview: Option<PreviewPa
     transformation = glm::rotate(&transformation, rotation.scalar(), &glm::vec3(0.0, 0.0, -1.0));
 
     if let Some(preview) = &as_preview {
-        let max_size = size.abs().max();
+        let max_size = glm::comp_max(&size.abs());
         let factor = 1.0.div_or_zero(max_size);
         transformation = glm::scale(&transformation, &glm::vec3(factor * preview.size, factor * preview.size, 0.0));
     }

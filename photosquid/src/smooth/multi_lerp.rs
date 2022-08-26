@@ -2,11 +2,29 @@ use super::{CircleLerpable, Lerpable};
 use enum_as_inner::EnumAsInner;
 use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, EnumAsInner, Serialize, Deserialize)]
-pub enum MultiLerp<T: Lerpable + CircleLerpable + Copy + Clone> {
+#[derive(Copy, Clone, EnumAsInner)]
+pub enum MultiLerp<T: Copy + Clone + Lerpable + CircleLerpable> {
     From(T),
     Linear(T),
     Circle(T, T::Origin),
+}
+
+impl<T: Copy + Clone + Lerpable + CircleLerpable + Serialize> Serialize for MultiLerp<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.reveal().serialize(serializer)
+    }
+}
+
+impl<'de, T: Deserialize<'de> + Copy + Lerpable + CircleLerpable> Deserialize<'de> for MultiLerp<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(MultiLerp::Linear(T::deserialize(deserializer)?))
+    }
 }
 
 impl<T: Lerpable + CircleLerpable + Copy + Clone> MultiLerp<T> {

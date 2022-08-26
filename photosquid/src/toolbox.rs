@@ -370,7 +370,7 @@ impl SelectionIndicator {
     pub fn new(start: glm::Vec2, horizontal: bool, display: &Display) -> Self {
         Self {
             external_index: 0,
-            position: Smooth::new(start, Duration::from_millis(100)),
+            position: Smooth::new(start, Some(Duration::from_millis(100))),
             mesh: MeshXyz::new(include_str!("_src_objs/selection_bubble.obj"), display),
             horizontal,
         }

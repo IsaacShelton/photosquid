@@ -25,8 +25,8 @@ impl Default for ColorPicker {
         Self {
             is_selecting_hue_value: false,
             is_selecting_saturation: false,
-            hue_value_point: Smooth::new(glm::vec2(0.0, 0.0), Duration::from_millis(200)),
-            saturation_point: Smooth::new(1.0, Duration::from_millis(200)),
+            hue_value_point: Smooth::new(glm::vec2(0.0, 0.0), Some(Duration::from_millis(200))),
+            saturation_point: Smooth::new(1.0, Some(Duration::from_millis(200))),
             color_changed_to: None,
             y: 64.0,
         }

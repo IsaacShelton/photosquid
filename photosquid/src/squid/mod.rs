@@ -27,10 +27,7 @@ use nalgebra_glm as glm;
 use rect::Rect;
 use serde::{Deserialize, Serialize};
 use slotmap::new_key_type;
-use std::{
-    cmp::Ordering,
-    time::{Duration, Instant},
-};
+use std::{cmp::Ordering, time::Instant};
 use tri::Tri;
 
 new_key_type! {
@@ -74,7 +71,7 @@ impl Squid {
             created: Instant::now(),
             data: SquidData::Rect(Rect {
                 mesh: None,
-                data: Smooth::new(data, Duration::from_millis(500)),
+                data: Smooth::new(data, None),
                 moving_corner: None,
                 translate_behavior: Default::default(),
                 rotating: false,
@@ -104,7 +101,7 @@ impl Squid {
             created: Instant::now(),
             data: SquidData::Circle(Circle {
                 mesh: None,
-                data: Smooth::new(data, Duration::from_millis(500)),
+                data: Smooth::new(data, None),
                 translate_behavior: Default::default(),
                 scale_rotating: false,
                 rotation_accumulator: Accumulator::new(),
@@ -141,7 +138,7 @@ impl Squid {
             created: Instant::now(),
             data: SquidData::Tri(Tri {
                 mesh: None,
-                data: Smooth::new(data, Duration::from_millis(500)),
+                data: Smooth::new(data, None),
                 mesh_p1: p1,
                 mesh_p2: p2,
                 mesh_p3: p3,

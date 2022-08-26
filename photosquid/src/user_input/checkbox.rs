@@ -61,7 +61,7 @@ impl Checkbox {
 
     fn update_checkmark(&mut self, ctx: &mut RenderCtx) {
         if self.color.is_none() {
-            self.color = Some(Smooth::new(ctx.color_scheme.light_ribbon, Duration::from_millis(200)));
+            self.color = Some(Smooth::new(ctx.color_scheme.light_ribbon, Some(Duration::from_millis(200))));
         }
 
         let checkmark = self

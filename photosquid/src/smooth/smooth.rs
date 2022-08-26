@@ -13,20 +13,24 @@ pub struct Smooth<T: Lerpable + Copy> {
     #[serde(skip, default = "Instant::now")]
     changed: Instant,
 
-    #[serde(skip)]
+    #[serde(skip, default = "default_smooth_duration")]
     duration: Duration,
+}
+
+pub fn default_smooth_duration() -> Duration {
+    return Duration::from_millis(500);
 }
 
 impl<T: Lerpable + Copy> Smooth<T>
 where
     <T as Lerpable>::Scalar: From<f32>,
 {
-    pub fn new(initial: T, duration: Duration) -> Self {
+    pub fn new(initial: T, duration: Option<Duration>) -> Self {
         Self {
             data: initial,
             previous: initial,
             changed: Instant::now(),
-            duration,
+            duration: duration.unwrap_or_else(|| default_smooth_duration()),
         }
     }
 

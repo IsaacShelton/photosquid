@@ -107,7 +107,6 @@ mod tests {
     use super::{Camera, EasySmoothCamera};
     use crate::smooth::Smooth;
     use nalgebra_glm as glm;
-    use std::time::Duration;
 
     #[test]
     fn camera_1() {
@@ -150,7 +149,7 @@ mod tests {
         let view = (glm::vec2(0.0, 0.0), glm::vec2(1000.0, 2000.0));
         let components = Camera::view_to_components(&window, view);
 
-        let mut camera = Smooth::new(Camera::identity(glm::zero()), Duration::from_millis(500));
+        let mut camera = Smooth::new(Camera::identity(glm::zero()), None);
 
         camera.set(Camera {
             position: components.0,
@@ -179,7 +178,7 @@ mod tests {
         let view = (glm::vec2(0.0, 0.0), glm::vec2(1000.0, 2000.0));
         let components = Camera::view_to_components(&window, view);
 
-        let mut camera = Smooth::new(Camera::identity(glm::zero()), Duration::from_millis(500));
+        let mut camera = Smooth::new(Camera::identity(glm::zero()), None);
 
         camera.set(Camera {
             position: components.0,
@@ -208,7 +207,7 @@ mod tests {
         let view = (glm::vec2(200.0, 400.0), glm::vec2(400.0, 800.0));
         let components = Camera::view_to_components(&window, view);
 
-        let mut camera = Smooth::new(Camera::identity(glm::zero()), Duration::from_millis(500));
+        let mut camera = Smooth::new(Camera::identity(glm::zero()), None);
 
         camera.set(Camera {
             position: components.0,

@@ -60,7 +60,7 @@ impl<T> IconButton<T> {
         if let Some(smooth_color) = self.color.as_mut() {
             smooth_color.set(*color);
         } else {
-            self.color = Some(Smooth::new(*color, Duration::from_millis(500)));
+            self.color = Some(Smooth::new(*color, None));
         }
 
         let identity = glm::identity::<f32, 4>();

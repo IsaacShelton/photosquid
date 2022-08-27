@@ -30,7 +30,7 @@ use glium::{
 use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;
 use slotmap::SlotMap;
-use std::{collections::btree_set::BTreeSet, rc::Rc, time::Instant};
+use std::{collections::btree_set::BTreeSet, fs, path::PathBuf, rc::Rc, time::Instant};
 
 pub const MULTISAMPLING_COUNT: u16 = 4;
 
@@ -64,7 +64,7 @@ pub struct App {
     pub wait_for_stop_drag: bool,
     pub operation: Option<Operation>,
     pub perform_next_operation_collectively: bool,
-    pub saved: String,
+    pub filename: Option<PathBuf>,
 }
 
 trait ControlOrCommand {
@@ -150,18 +150,6 @@ impl App {
             return;
         }
 
-        // Experimental save
-        if key == VirtualKeyCode::F1 {
-            let saved = serde_json::to_string(&self.ocean).unwrap();
-            println!("{}", saved);
-            self.saved = saved;
-        }
-
-        // Experimental load
-        if key == VirtualKeyCode::F2 {
-            self.ocean = serde_json::from_str(&self.saved).unwrap();
-        }
-
         if let Some(tool_key) = self.toolbox.get_selected() {
             let interaction = Interaction::Key(KeyInteraction { virtual_keycode: key });
 
@@ -202,8 +190,6 @@ impl App {
     }
 
     pub fn handle_captured(&mut self, capture: &Capture, _camera: &Camera) {
-        // TODO: Fix collective operations when camera is zoomed in/out and not at (0, 0)
-
         match capture {
             Capture::Miss => (),
             Capture::AllowDrag => (),
@@ -255,11 +241,15 @@ impl App {
         }
     }
 
+    pub fn clear_selection(&mut self) {
+        self.selections.clear();
+    }
+
     pub fn delete_selected(&mut self) {
         for squid_id in self.get_selected_squids() {
             self.ocean.remove(squid_id);
         }
-        self.selections.clear();
+        self.clear_selection();
     }
 
     pub fn duplicate_selected(&mut self) {
@@ -275,7 +265,7 @@ impl App {
             .map(|squid_id| self.insert(self.ocean.get(*squid_id).unwrap().duplicate(&offset)))
             .collect();
 
-        self.selections.clear();
+        self.clear_selection();
         self.selections = created.iter().map(|squid_id| Selection::new(*squid_id, None)).collect();
     }
 
@@ -433,5 +423,36 @@ impl App {
         let mouse = self.mouse_position.unwrap();
         let camera = self.camera.get_animated();
         camera.apply_reverse(&glm::vec2(mouse.x, mouse.y))
+    }
+
+    pub fn save_to_file(&mut self, filename: PathBuf) {
+        let contents = serde_json::to_string(&self.ocean).expect("Failed to serialize project");
+        fs::write(&filename, contents).expect("Failed to write project file to disk");
+        self.filename = Some(filename);
+        self.update_title();
+    }
+
+    pub fn load_from_file(&mut self, filename: PathBuf) {
+        let contents = fs::read_to_string(&filename).expect("Failed to read project file from disk");
+        self.ocean = serde_json::from_str(&contents).expect("Bad project format");
+        self.filename = Some(filename);
+        self.reset_camera();
+        self.clear_selection();
+        self.update_title();
+    }
+
+    pub fn reset_camera(&mut self) {
+        self.camera.set(Camera::identity(self.dimensions))
+    }
+
+    pub fn update_title(&mut self) {
+        let new_title = match self.filename.as_ref().map(|filepath| filepath.file_name()).flatten() {
+            Some(filename) => {
+                format!("Photosquid :) - {}", filename.to_str().unwrap())
+            }
+            None => "Photosquid :)".into(),
+        };
+
+        self.display.gl_window().window().set_title(&new_title);
     }
 }

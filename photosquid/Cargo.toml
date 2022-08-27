@@ -23,6 +23,7 @@ lazy_static = "1.4"
 derive_deref = "1.1.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+native-dialog = { version = "0.6.3", features = ["windows_dpi_awareness", "windows_visual_styles"] }
 
 # bincode = "1.2.1"
 # approx = "0.5.0"

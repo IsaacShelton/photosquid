@@ -26,6 +26,7 @@ mod history;
 mod icon_button;
 mod interaction;
 mod interaction_options;
+mod io;
 mod layer;
 mod linear_set;
 mod math_helpers;
@@ -170,7 +171,7 @@ fn main() {
         wait_for_stop_drag: false,
         operation: None,
         perform_next_operation_collectively: false,
-        saved: "".into(),
+        filename: None,
     };
 
     event_loop.run(move |abstract_event, _, control_flow| {

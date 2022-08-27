@@ -13,7 +13,7 @@ use crate::{
     color::Color,
     color_scheme::ColorScheme,
     context_menu::{ContextAction, ContextMenu, ContextMenuOption},
-    data::{CircleData, RectData, TriData},
+    data::{rect::BorderRadii, CircleData, RectData, TriData},
     interaction::Interaction,
     interaction_options::InteractionOptions,
     render_ctx::RenderCtx,
@@ -59,7 +59,7 @@ impl Squid {
             size,
             rotation,
             color: NoLerp(color),
-            radii,
+            radii: BorderRadii::new(radii),
         };
 
         Self::rect_from(data)

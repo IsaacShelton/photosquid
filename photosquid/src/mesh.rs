@@ -1,5 +1,6 @@
 use crate::{
     color::Color,
+    data::rect::BorderRadii,
     matrix_helpers::reach_inside_mat4,
     obj_helpers,
     render_ctx::RenderCtx,
@@ -90,10 +91,10 @@ impl MeshXyz {
         Self::new(include_str!("_src_objs/shape/circle.obj"), display)
     }
 
-    pub fn new_rect(display: &Display, size: glm::Vec2, radii: f32) -> Self {
+    pub fn new_rect(display: &Display, size: glm::Vec2, radii: BorderRadii) -> Self {
         use lyon::{
             path::{
-                builder::{BorderRadii, PathBuilder},
+                builder::PathBuilder,
                 math::{point, Rect, Size},
                 Winding,
             },
@@ -106,7 +107,7 @@ impl MeshXyz {
         let mut builder = lyon::path::Path::builder();
         builder.add_rounded_rectangle(
             &Rect::new(point(-width / 2.0, -height / 2.0), Size::new(width, height)),
-            &BorderRadii::new(radii),
+            &radii.into(),
             Winding::Positive,
         );
         let lyon_path = builder.build();

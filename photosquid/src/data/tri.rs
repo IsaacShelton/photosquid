@@ -19,14 +19,14 @@ pub struct TriData {
 impl Lerpable for TriData {
     type Scalar = f32;
 
-    fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
+    fn lerp(&self, other: &Self, scalar: Self::Scalar) -> Self {
         Self {
-            p1: Lerpable::lerp(&self.p1, &other.p1, scalar),
-            p2: Lerpable::lerp(&self.p2, &other.p2, scalar),
-            p3: Lerpable::lerp(&self.p3, &other.p3, scalar),
+            p1: self.p1.lerp(&other.p1, scalar),
+            p2: self.p2.lerp(&other.p2, scalar),
+            p3: self.p3.lerp(&other.p3, scalar),
             position: self.position.lerp(&other.position, scalar),
-            rotation: angular_units::Interpolate::interpolate(&self.rotation, &other.rotation, *scalar),
-            color: Lerpable::lerp(&self.color, &other.color, scalar),
+            rotation: self.rotation.lerp(&other.rotation, scalar),
+            color: self.color.lerp(&other.color, scalar),
         }
     }
 }

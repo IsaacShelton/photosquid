@@ -17,12 +17,12 @@ pub struct CircleData {
 impl Lerpable for CircleData {
     type Scalar = f32;
 
-    fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
+    fn lerp(&self, other: &Self, scalar: Self::Scalar) -> Self {
         Self {
-            position: Lerpable::lerp(&self.position, &other.position, scalar),
-            radius: interpolation::Lerp::lerp(&self.radius, &other.radius, scalar),
-            color: Lerpable::lerp(&self.color, &other.color, scalar),
-            virtual_rotation: angular_units::Interpolate::interpolate(&self.virtual_rotation, &other.virtual_rotation, *scalar),
+            position: self.position.lerp(&other.position, scalar),
+            radius: self.radius.lerp(&other.radius, scalar),
+            color: self.color.lerp(&other.color, scalar),
+            virtual_rotation: self.virtual_rotation.lerp(&other.virtual_rotation, scalar),
         }
     }
 }

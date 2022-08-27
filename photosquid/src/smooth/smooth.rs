@@ -39,7 +39,7 @@ where
     }
 
     pub fn get_animated(&self) -> T {
-        Lerpable::lerp(&self.previous, &self.data, &self.t())
+        self.previous.lerp(&self.data, self.t())
     }
 
     pub fn t(&self) -> <T as Lerpable>::Scalar {

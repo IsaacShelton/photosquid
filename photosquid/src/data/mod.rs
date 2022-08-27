@@ -1,6 +1,6 @@
-mod circle;
-mod rect;
-mod tri;
+pub mod circle;
+pub mod rect;
+pub mod tri;
 
 pub use circle::CircleData;
 pub use rect::RectData;

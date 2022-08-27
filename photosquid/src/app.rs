@@ -3,6 +3,7 @@ use crate::{
     capture::Capture,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
+    dialog::{ask_open, ask_save},
     dragging::Dragging,
     history::History,
     interaction::{Interaction, KeyInteraction},
@@ -131,23 +132,33 @@ impl App {
     pub fn press_key(&mut self, key: VirtualKeyCode, tools: &mut SlotMap<ToolKey, Tool>) {
         use crate::camera::EasySmoothCamera;
 
-        if self.modifiers_held.control_or_command() && key == VirtualKeyCode::Z {
-            if self.modifiers_held.shift() {
-                self.redo();
-            } else {
-                self.undo();
+        if self.modifiers_held.control_or_command() {
+            let shift = self.modifiers_held.shift();
+
+            match key {
+                VirtualKeyCode::Z => {
+                    if shift {
+                        self.redo();
+                    } else {
+                        self.undo();
+                    }
+                    return;
+                }
+                VirtualKeyCode::Equals => {
+                    self.camera.increase_zoom();
+                    return;
+                }
+                VirtualKeyCode::Minus => {
+                    self.camera.decrease_zoom();
+                    return;
+                }
+                VirtualKeyCode::O => {
+                    self.load();
+                    return;
+                }
+                VirtualKeyCode::S => self.save(if shift { SaveMethod::SaveAs } else { SaveMethod::Save }),
+                _ => (),
             }
-            return;
-        }
-
-        if self.modifiers_held.control_or_command() && key == VirtualKeyCode::Equals {
-            self.camera.increase_zoom();
-            return;
-        }
-
-        if self.modifiers_held.control_or_command() && key == VirtualKeyCode::Minus {
-            self.camera.decrease_zoom();
-            return;
         }
 
         if let Some(tool_key) = self.toolbox.get_selected() {
@@ -425,6 +436,25 @@ impl App {
         camera.apply_reverse(&glm::vec2(mouse.x, mouse.y))
     }
 
+    pub fn save(&mut self, method: SaveMethod) {
+        if let Some(filename) = match method {
+            SaveMethod::Save => self
+                .filename
+                .as_ref()
+                .map(|existing_filename| existing_filename.clone())
+                .or_else(|| ask_save().unwrap_or(None)),
+            SaveMethod::SaveAs => ask_save().unwrap_or(None),
+        } {
+            self.save_to_file(filename);
+        }
+    }
+
+    pub fn load(&mut self) {
+        if let Ok(Some(filename)) = ask_open() {
+            self.load_from_file(filename);
+        }
+    }
+
     pub fn save_to_file(&mut self, filename: PathBuf) {
         let contents = serde_json::to_string(&self.ocean).expect("Failed to serialize project");
         fs::write(&filename, contents).expect("Failed to write project file to disk");
@@ -455,4 +485,10 @@ impl App {
 
         self.display.gl_window().window().set_title(&new_title);
     }
+}
+
+#[derive(PartialEq)]
+pub enum SaveMethod {
+    Save,
+    SaveAs,
 }

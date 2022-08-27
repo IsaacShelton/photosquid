@@ -40,11 +40,11 @@ impl<T: Lerpable + CircleLerpable + Copy + Clone> MultiLerp<T> {
 impl<T: Lerpable<Scalar = f32> + CircleLerpable<Scalar = f32> + Copy + Clone> Lerpable for MultiLerp<T> {
     type Scalar = f32;
 
-    fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
+    fn lerp(&self, other: &Self, scalar: Self::Scalar) -> Self {
         Self::From(match other {
             Self::From(value) => *value,
             Self::Linear(value) => self.reveal().lerp(value, scalar),
-            Self::Circle(value, origin) => CircleLerpable::circle_lerp(&self.reveal(), value, origin, scalar),
+            Self::Circle(value, origin) => CircleLerpable::circle_lerp(&self.reveal(), value, *origin, scalar),
         })
     }
 }

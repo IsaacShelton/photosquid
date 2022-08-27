@@ -6,11 +6,13 @@ mod tri;
 
 use crate::{
     aabb::AABB,
-    app::App,
+    app::{
+        App,
+        SaveMethod::{Save, SaveAs},
+    },
     camera::EasySmoothCamera,
     capture::{Capture, KeyCapture},
     interaction::{ClickInteraction, Interaction, KeyInteraction},
-    io::{ask_open, ask_save},
     render_ctx::RenderCtx,
     user_input::{Button, TextInput, UserInput},
 };
@@ -43,36 +45,9 @@ impl Tool {
         Self {
             kind: ToolKind::MainMenu,
             user_inputs: vec![
-                UserInput::Button(Button::new(
-                    "Open".to_string(),
-                    Box::new(|app| {
-                        if let Ok(Some(filename)) = ask_open() {
-                            app.load_from_file(filename);
-                        }
-                    }),
-                )),
-                UserInput::Button(Button::new(
-                    "Save".to_string(),
-                    Box::new(|app| {
-                        let possibly_filename = if let Some(existing_filename) = app.filename.as_ref() {
-                            Some(existing_filename.clone())
-                        } else {
-                            ask_save().unwrap_or(None)
-                        };
-
-                        if let Some(filename) = possibly_filename {
-                            app.save_to_file(filename);
-                        }
-                    }),
-                )),
-                UserInput::Button(Button::new(
-                    "Save As".to_string(),
-                    Box::new(|app| {
-                        if let Ok(Some(filename)) = ask_save() {
-                            app.save_to_file(filename);
-                        }
-                    }),
-                )),
+                UserInput::Button(Button::new("Open".to_string(), Box::new(|app| app.load()))),
+                UserInput::Button(Button::new("Save".to_string(), Box::new(|app| app.save(Save)))),
+                UserInput::Button(Button::new("Save As".to_string(), Box::new(|app| app.save(SaveAs)))),
                 UserInput::Button(Button::new(
                     "Export".to_string(),
                     Box::new(|_| {

@@ -234,10 +234,10 @@ mod tests {
 impl Lerpable for Camera {
     type Scalar = f32;
 
-    fn lerp(&self, other: &Self, scalar: &Self::Scalar) -> Self {
+    fn lerp(&self, other: &Self, scalar: Self::Scalar) -> Self {
         Camera {
             position: Lerpable::lerp(&self.position, &other.position, scalar),
-            zoom: interpolation::Lerp::lerp(&self.zoom, &other.zoom, scalar),
+            zoom: self.zoom.lerp(&other.zoom, scalar),
             window: other.window,
         }
     }

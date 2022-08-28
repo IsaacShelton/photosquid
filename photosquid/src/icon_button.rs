@@ -1,4 +1,4 @@
-use crate::{color::Color, matrix::reach_inside_mat4, mesh::MeshXyz, press_animation::PressAnimation, render_ctx::RenderCtx, smooth::Smooth};
+use crate::{as_values::AsValues, color::Color, mesh::MeshXyz, press_animation::PressAnimation, render_ctx::RenderCtx, smooth::Smooth};
 use angular_units::Angle;
 use glium::Display;
 use nalgebra_glm as glm;
@@ -71,10 +71,10 @@ impl<T> IconButton<T> {
         let transformation = glm::scale(&transformation, &glm::vec3(real_scale, real_scale, 0.0));
 
         let uniforms = glium::uniform! {
-            transformation: reach_inside_mat4(&transformation),
-            view: reach_inside_mat4(&identity),
-            projection: reach_inside_mat4(ctx.projection),
-            color: Into::<[f32; 4]>::into(color)
+            transformation: transformation.as_values(),
+            view: identity.as_values(),
+            projection: ctx.projection.as_values(),
+            color: color.as_values()
         };
 
         ctx.draw(&self.mesh.vertex_buffer, &self.mesh.indices, ctx.color_shader, &uniforms, &Default::default())

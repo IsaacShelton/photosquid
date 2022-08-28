@@ -1,9 +1,9 @@
 use crate::{
     aabb::AABB,
+    as_values::AsValues,
     capture::Capture,
     color::Color,
     interaction::{DragInteraction, Interaction},
-    matrix::reach_inside_mat4,
     render_ctx::RenderCtx,
     smooth::Smooth,
 };
@@ -165,10 +165,11 @@ impl ColorPicker {
         let identity = glm::identity::<f32, 4>();
         let transformation = glm::translation(&glm::vec3(dimensions.x / 2.0 + x, dimensions.y / 2.0 + y, 0.0));
         let transformation = glm::scale(&transformation, &glm::vec3(dimensions.x / 2.0, dimensions.y / 2.0, 0.0));
+
         let uniforms = glium::uniform! {
-            transformation: reach_inside_mat4(&transformation),
-            view: reach_inside_mat4(&identity),
-            projection: reach_inside_mat4(ctx.projection),
+            transformation: transformation.as_values(),
+            view: identity.as_values(),
+            projection: ctx.projection.as_values(),
             saturation: self.saturation_point.get_animated(),
             point: [hue_value_point_animated.x, hue_value_point_animated.y],
             dimensions: [dimensions.x, dimensions.y],
@@ -200,9 +201,9 @@ impl ColorPicker {
         let transformation = glm::translation(&glm::vec3(dimensions.x / 2.0 + x, dimensions.y / 2.0 + y, 0.0));
         let transformation = glm::scale(&transformation, &glm::vec3(dimensions.x / 2.0, dimensions.y / 2.0, 0.0));
         let uniforms = glium::uniform! {
-            transformation: reach_inside_mat4(&transformation),
-            view: reach_inside_mat4(&identity),
-            projection: reach_inside_mat4(ctx.projection),
+            transformation: transformation.as_values(),
+            view: identity.as_values(),
+            projection: ctx.projection.as_values(),
             hue: hue,
             value: value,
             point: [self.get_saturation_point().get_animated(), 0.5],

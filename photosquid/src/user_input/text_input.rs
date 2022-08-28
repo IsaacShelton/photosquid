@@ -1,8 +1,8 @@
 use crate::{
     aabb::AABB,
+    as_values::AsValues,
     capture::{Capture, KeyCapture},
     color::Color,
-    matrix::reach_inside_mat4,
     render_ctx::RenderCtx,
     text_helpers,
 };
@@ -163,10 +163,10 @@ impl TextInput {
         let transformation = glm::scale(&transformation, &glm::vec3(quad_dimensions.x * 0.5, quad_dimensions.y * 0.5, 0.0));
 
         let uniforms = glium::uniform! {
-            transformation: reach_inside_mat4(&transformation),
-            view: reach_inside_mat4(&identity),
-            projection: reach_inside_mat4(ctx.projection),
-            rectangle_color: Into::<[f32; 4]>::into(ctx.color_scheme.light_ribbon),
+            transformation: transformation.as_values(),
+            view: identity.as_values(),
+            projection: ctx.projection.as_values(),
+            rectangle_color: ctx.color_scheme.light_ribbon.as_values(),
             dimensions: [quad_dimensions.x, quad_dimensions.y],
             height_scale: 1.0f32,
             do_shadow: 0

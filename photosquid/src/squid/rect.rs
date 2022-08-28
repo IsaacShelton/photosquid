@@ -5,12 +5,12 @@ use super::{
 use crate::{
     accumulator::Accumulator,
     algorithm,
+    as_values::AsValues,
     camera::Camera,
     capture::Capture,
     data::RectData,
     interaction::{ClickInteraction, DragInteraction, Interaction, MouseReleaseInteraction},
     math::DivOrZero,
-    matrix,
     mesh::MeshXyz,
     render_ctx::RenderCtx,
     smooth::Smooth,
@@ -227,32 +227,32 @@ pub fn render(rect: &mut Rect, ctx: &mut RenderCtx, as_preview: Option<PreviewPa
         }
     }
 
-    let render_position = if let Some(preview) = &as_preview {
+    // Translate
+    let mut transformation = glm::translation(&glm::vec2_to_vec3(&if let Some(preview) = &as_preview {
         preview.position
     } else {
         position.reveal()
-    };
+    }));
 
-    let mut transformation = glm::translation(&glm::vec2_to_vec3(&render_position));
+    // Rotate
     transformation = glm::rotate(&transformation, rotation.scalar(), &glm::vec3(0.0, 0.0, -1.0));
 
+    // Scale
     if let Some(preview) = &as_preview {
         let max_size = glm::comp_max(&size.abs());
-        let factor = 1.0.div_or_zero(max_size);
-        transformation = glm::scale(&transformation, &glm::vec3(factor * preview.size, factor * preview.size, 0.0));
+        let preview_scale = preview.radius.div_or_zero(max_size);
+        transformation = glm::scale(&transformation, &glm::vec3(preview_scale, preview_scale, 0.0));
     }
 
-    let raw_view = if as_preview.is_some() {
-        matrix::reach_inside_mat4(&glm::identity::<f32, 4>())
-    } else {
-        matrix::reach_inside_mat4(ctx.view)
-    };
-
     let uniforms = glium::uniform! {
-        transformation: matrix::reach_inside_mat4(&transformation),
-        view: raw_view,
-        projection: matrix::reach_inside_mat4(ctx.projection),
-        color: Into::<[f32; 4]>::into(color.0)
+        transformation: transformation.as_values(),
+        view: if as_preview.is_some() {
+            glm::identity::<f32, 4>().as_values()
+        } else {
+            ctx.view.as_values()
+        },
+        projection: ctx.projection.as_values(),
+        color: color.as_values()
     };
 
     let mesh = rect.mesh.as_ref().unwrap();

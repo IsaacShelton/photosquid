@@ -1,12 +1,12 @@
 use crate::{
     accumulator::Accumulator,
     algorithm::{get_distance_between_point_and_triangle, get_triangle_center, is_point_inside_triangle},
+    as_values::AsValues,
     camera::Camera,
     capture::Capture,
     data::TriData,
     interaction::{ClickInteraction, DragInteraction, Interaction, MouseReleaseInteraction},
     math::DivOrZero,
-    matrix,
     mesh::MeshXyz,
     render_ctx::RenderCtx,
     smooth::{MultiLerp, Smooth},
@@ -96,26 +96,28 @@ pub fn render(tri: &mut Tri, ctx: &mut RenderCtx, as_preview: Option<PreviewPara
         let max_distance = glm::distance(&p1, &position).max(glm::distance(&p2, &position).max(glm::distance(&p3, &position)));
         let factor = 1.0.div_or_zero(max_distance);
 
-        (preview.position, factor * preview.size)
+        (preview.position, factor * preview.radius)
     } else {
         (position, 1.0)
     };
 
-    let mut transformation = glm::translation(&glm::vec2_to_vec3(&render_position));
-    transformation = glm::rotate(&transformation, rotation.scalar(), &glm::vec3(0.0, 0.0, -1.0));
-    transformation = glm::scale(&transformation, &glm::vec3(render_size, render_size, 0.0));
-
-    let raw_view = if as_preview.is_some() {
-        matrix::reach_inside_mat4(&glm::identity::<f32, 4>())
-    } else {
-        matrix::reach_inside_mat4(ctx.view)
+    let transformation = {
+        let mut matrix;
+        matrix = glm::translation(&glm::vec2_to_vec3(&render_position));
+        matrix = glm::rotate(&matrix, rotation.scalar(), &glm::vec3(0.0, 0.0, -1.0));
+        matrix = glm::scale(&matrix, &glm::vec3(render_size, render_size, 0.0));
+        matrix
     };
 
     let uniforms = glium::uniform! {
-        transformation: matrix::reach_inside_mat4(&transformation),
-        view: raw_view,
-        projection: matrix::reach_inside_mat4(ctx.projection),
-        color: Into::<[f32; 4]>::into(color.0)
+        transformation: transformation.as_values(),
+        view: if as_preview.is_some() {
+            glm::identity::<f32, 4>().as_values()
+        } else {
+            ctx.view.as_values()
+        },
+        projection: ctx.projection.as_values(),
+        color: color.as_values()
     };
 
     let mesh = tri.mesh.as_ref().unwrap();

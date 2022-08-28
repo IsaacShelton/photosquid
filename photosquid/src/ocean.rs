@@ -1,5 +1,4 @@
 use crate::{
-    annotations::UnsafeTemporary,
     camera::Camera,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
@@ -12,23 +11,13 @@ use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
 
 // A world that objects (aka squids) live in
-// NOTE: Only use direct access if you know what you're doing
-// Use #[allow(deprecated)] to silence warnings when using internal fields
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Ocean {
-    #[deprecated]
-    pub current_layer: usize,
-
-    #[deprecated]
-    pub layers: Vec<Layer>,
-
-    #[deprecated]
-    pub squids: SlotMap<SquidRef, Squid>,
+    current_layer: usize,
+    layers: Vec<Layer>,
+    squids: SlotMap<SquidRef, Squid>,
 }
 
-// Using #[allow(deprecated)] to silence warnings about manually accessing internal
-// fields of 'Ocean' struct
-#[allow(deprecated)]
 impl Default for Ocean {
     fn default() -> Self {
         Self {
@@ -39,9 +28,6 @@ impl Default for Ocean {
     }
 }
 
-// Using #[allow(deprecated)] to silence warnings about manually accessing internal
-// fields of 'Ocean' struct
-#[allow(deprecated)]
 impl Ocean {
     pub fn insert(&mut self, value: Squid) -> SquidRef {
         let reference = self.squids.insert(value);
@@ -70,12 +56,16 @@ impl Ocean {
         self.squids.remove(reference);
     }
 
-    pub fn get(&self, reference: SquidRef) -> Option<UnsafeTemporary<&Squid>> {
+    pub fn get(&self, reference: SquidRef) -> Option<&Squid> {
         self.squids.get(reference)
     }
 
-    pub fn get_mut(&mut self, reference: SquidRef) -> Option<UnsafeTemporary<&mut Squid>> {
+    pub fn get_mut(&mut self, reference: SquidRef) -> Option<&mut Squid> {
         self.squids.get_mut(reference)
+    }
+
+    pub fn get_squids_and_layers(&mut self) -> (&mut SlotMap<SquidRef, Squid>, &mut Vec<Layer>) {
+        (&mut self.squids, &mut self.layers)
     }
 
     pub fn get_layers(&self) -> &[Layer] {

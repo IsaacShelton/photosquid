@@ -683,5 +683,5 @@ pub fn common_context_menu(underneath: glm::Vec2, color_scheme: &ColorScheme) ->
 
 pub struct PreviewParams {
     pub position: glm::Vec2,
-    pub size: f32,
+    pub radius: f32,
 }

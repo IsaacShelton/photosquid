@@ -1,7 +1,7 @@
 use crate::{
+    as_values::AsValues,
     color::Color,
     data::rect::BorderRadii,
-    matrix::reach_inside_mat4,
     obj,
     render_ctx::RenderCtx,
     vertex::{Vertex, VertexXYUV},
@@ -137,10 +137,10 @@ impl MeshXyz {
         let transformation = glm::scale(&transformation, &glm::vec2_to_vec3(&scale));
 
         let uniforms = glium::uniform! {
-            transformation: reach_inside_mat4(&transformation),
-            view: reach_inside_mat4(&identity),
-            projection: reach_inside_mat4(ctx.projection),
-            color: Into::<[f32; 4]>::into(color)
+            transformation: transformation.as_values(),
+            view: identity.as_values(),
+            projection: ctx.projection.as_values(),
+            color: color.as_values()
         };
 
         ctx.draw(&self.vertex_buffer, &self.indices, ctx.color_shader, &uniforms, &Default::default())

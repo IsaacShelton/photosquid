@@ -4,12 +4,12 @@ use super::{
 };
 use crate::{
     accumulator::Accumulator,
+    as_values::AsValues,
     camera::Camera,
     capture::Capture,
     data::CircleData,
     interaction::{ClickInteraction, DragInteraction, Interaction, MouseReleaseInteraction},
     math::angle_difference,
-    matrix,
     mesh::MeshXyz,
     render_ctx::RenderCtx,
     smooth::Smooth,
@@ -63,7 +63,7 @@ pub fn render(circle: &mut Circle, ctx: &mut RenderCtx, as_preview: Option<Previ
     }
 
     let (render_position, render_radius) = if let Some(preview) = &as_preview {
-        (preview.position, preview.size * 0.5)
+        (preview.position, preview.radius * 0.5)
     } else {
         (position.reveal(), radius)
     };
@@ -71,17 +71,15 @@ pub fn render(circle: &mut Circle, ctx: &mut RenderCtx, as_preview: Option<Previ
     let mut transformation = glm::translation(&glm::vec2_to_vec3(&render_position));
     transformation = glm::scale(&transformation, &glm::vec3(render_radius, render_radius, 0.0));
 
-    let raw_view = if as_preview.is_some() {
-        matrix::reach_inside_mat4(&glm::identity::<f32, 4>())
-    } else {
-        matrix::reach_inside_mat4(ctx.view)
-    };
-
     let uniforms = glium::uniform! {
-        transformation: matrix::reach_inside_mat4(&transformation),
-        view: raw_view,
-        projection: matrix::reach_inside_mat4(ctx.projection),
-        color: Into::<[f32; 4]>::into(color.0)
+        transformation: transformation.as_values(),
+        view: if as_preview.is_some() {
+            glm::identity::<f32, 4>().as_values()
+        } else {
+            ctx.view.as_values()
+        },
+        projection: ctx.projection.as_values(),
+        color: color.as_values()
     };
 
     let mesh = circle.mesh.as_ref().unwrap();

@@ -1,8 +1,8 @@
 use crate::{
+    as_values::AsValues,
     capture::Capture,
     color::Color,
     interaction::{ClickInteraction, DragInteraction, Interaction},
-    matrix::reach_inside_mat4,
     mesh::MeshXyz,
     ocean::Ocean,
     options,
@@ -390,10 +390,10 @@ impl SelectionIndicator {
         }
 
         let uniforms = glium::uniform! {
-            transformation: reach_inside_mat4(&transformation),
-            view: reach_inside_mat4(&identity),
-            projection: reach_inside_mat4(ctx.projection),
-            color: Into::<[f32; 4]>::into(color)
+            transformation: transformation.as_values(),
+            view: identity.as_values(),
+            projection: ctx.projection.as_values(),
+            color: color.as_values()
         };
 
         ctx.draw(&self.mesh.vertex_buffer, &self.mesh.indices, ctx.color_shader, &uniforms, &Default::default())

@@ -10,7 +10,7 @@ use crate::{
     squid::PreviewParams,
     text_helpers,
 };
-use glium_text_rusttype::{FontTexture, TextDisplay, TextSystem};
+use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;
 use std::rc::Rc;
 
@@ -20,76 +20,6 @@ impl Layers {
     pub fn new() -> Self {
         Self {}
     }
-
-    #[allow(clippy::too_many_arguments)]
-    fn render_layer(
-        &mut self,
-        ctx: &mut RenderCtx,
-        text_system: &TextSystem,
-        font: Rc<FontTexture>,
-        y: &mut f32,
-        ocean: &mut Ocean,
-        selections: &[Selection],
-        layer_index: usize,
-    ) {
-        let start_x = ctx.width - 256.0 + 16.0;
-        let mut text_display: Option<TextDisplay<Rc<FontTexture>>> = None;
-
-        // Use '#[allow(deprecated)]' to silence warning when manually accessing
-        // internal fields of 'Ocean' struct
-        #[allow(deprecated)]
-        let layer = &ocean.layers[layer_index];
-
-        // Draw layer name
-        text_helpers::draw_text(
-            &mut text_display,
-            text_system,
-            font.clone(),
-            layer.get_name(),
-            &glm::vec2(start_x, *y),
-            ctx,
-            Color::from_hex("#555555"),
-        );
-
-        *y += 30.0;
-
-        // This should be valid without direct access, due to the implementation
-        // of Ocean::get_mut(), but Rust isn't having it,
-        // so we'll have reach into the actual fields of 'ocean' in order for it
-        // to be allowed
-        for squid_reference in &layer.squids {
-            // Use '#[allow(deprecated)]' to silence warning when manually accessing
-            // internal fields of 'Ocean' struct
-            #[allow(deprecated)]
-            let maybe_squid = ocean.squids.get_mut(*squid_reference);
-
-            if let Some(squid) = maybe_squid {
-                let preview = Some(PreviewParams {
-                    position: glm::vec2(start_x + 4.0, *y - 4.0),
-                    size: 8.0,
-                });
-                squid.render(ctx, preview);
-
-                let color = if selection_contains(selections, *squid_reference) {
-                    ctx.color_scheme.foreground
-                } else {
-                    Color::from_hex("#777777")
-                };
-
-                text_display = None;
-                text_helpers::draw_text(
-                    &mut text_display,
-                    text_system,
-                    font.clone(),
-                    squid.get_name(),
-                    &glm::vec2(start_x + 24.0, *y),
-                    ctx,
-                    color,
-                );
-                *y += 30.0;
-            }
-        }
-    }
 }
 
 impl Tab for Layers {
@@ -98,10 +28,68 @@ impl Tab for Layers {
     }
 
     fn render(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>, ocean: &mut Ocean, selections: &[Selection]) {
+        const LAYERS_TAB_WIDTH: f32 = 256.0;
+        const LEFT_MARGIN: f32 = 16.0;
+
         let mut y = 100.0;
 
-        for i in 0..ocean.get_layers().len() {
-            self.render_layer(ctx, text_system, font.clone(), &mut y, ocean, selections, i);
+        let (squids, layers) = ocean.get_squids_and_layers();
+        let left = ctx.width - LAYERS_TAB_WIDTH + LEFT_MARGIN;
+
+        for layer in layers.iter() {
+            const SMALL_STRIP_HEIGHT: f32 = 30.0;
+
+            // Draw layer name
+            text_helpers::draw_text(
+                &mut None,
+                text_system,
+                font.clone(),
+                layer.get_name(),
+                &glm::vec2(left, y),
+                ctx,
+                Color::from_hex("#555555"),
+            );
+
+            // Move draw area down
+            y += SMALL_STRIP_HEIGHT;
+
+            for squid_ref in layer.squids.iter() {
+                if let Some(squid) = squids.get_mut(*squid_ref) {
+                    const PREVIEW_PADDING: f32 = 4.0;
+                    const PREVIEW_RADIUS: f32 = 8.0;
+                    const PREVIEW_SIZE_WITH_PADDING: f32 = 2.0 * PREVIEW_PADDING + 2.0 * PREVIEW_RADIUS;
+
+                    // Draw squid preview
+                    squid.render(
+                        ctx,
+                        Some(PreviewParams {
+                            position: glm::vec2(left + PREVIEW_PADDING, y - PREVIEW_PADDING),
+                            radius: PREVIEW_RADIUS,
+                        }),
+                    );
+
+                    // Choose text color
+                    let color = if selection_contains(selections, *squid_ref) {
+                        ctx.color_scheme.foreground
+                    } else {
+                        Color::from_hex("#777777")
+                    };
+
+                    // Draw squid name
+                    text_helpers::draw_text(
+                        &mut None,
+                        text_system,
+                        font.clone(),
+                        squid.get_name(),
+                        &glm::vec2(left + PREVIEW_SIZE_WITH_PADDING, y),
+                        ctx,
+                        color,
+                    );
+
+                    // Move draw area down
+                    y += SMALL_STRIP_HEIGHT;
+                }
+            }
         }
     }
 }

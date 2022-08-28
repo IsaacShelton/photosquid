@@ -10,9 +10,9 @@
 mod aabb;
 mod accumulator;
 mod algorithm;
-mod annotations;
 mod app;
 mod approx_instant;
+mod as_values;
 mod bool_poll;
 mod camera;
 mod capture;
@@ -29,7 +29,6 @@ mod interaction;
 mod interaction_options;
 mod layer;
 mod math;
-mod matrix;
 mod mesh;
 mod obj;
 mod ocean;
@@ -52,6 +51,7 @@ mod vertex;
 
 const TARGET_FPS: u64 = 60;
 
+use crate::as_values::AsValues;
 use app::{App, MULTISAMPLING_COUNT};
 use camera::Camera;
 use capture::Capture;
@@ -360,14 +360,13 @@ fn render_television(target: &mut glium::Frame, rendered: &glium::texture::SrgbT
     // Draw render to window
 
     use glium::Surface;
-    use matrix::reach_inside_mat4;
 
     let identity = glm::identity::<f32, 4>();
 
     let uniforms = glium::uniform! {
-        transformation: reach_inside_mat4(&identity),
-        view: reach_inside_mat4(&identity),
-        projection: reach_inside_mat4(&identity),
+        transformation: identity.as_values(),
+        view: identity.as_values(),
+        projection: identity.as_values(),
         texture_sampler: rendered
     };
 

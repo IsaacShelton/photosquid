@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{app::App, color::Color, matrix::reach_inside_mat4, text_helpers};
+use crate::{app::App, as_values::AsValues, color::Color, text_helpers};
 use glium::glutin::event::MouseButton;
 use glium_text_rusttype::{FontTexture, TextDisplay, TextSystem};
 use nalgebra_glm as glm;
@@ -48,10 +48,10 @@ impl Button {
         let transformation = glm::scale(&transformation, &glm::vec2_to_vec3(&(quad_dimensions * 0.5)));
 
         let uniforms = glium::uniform! {
-            transformation: reach_inside_mat4(&transformation),
-            view: reach_inside_mat4(&identity),
-            projection: reach_inside_mat4(ctx.projection),
-            rectangle_color: Into::<[f32; 4]>::into(ctx.color_scheme.dark_foreground),
+            transformation: transformation.as_values(),
+            view: identity.as_values(),
+            projection: ctx.projection.as_values(),
+            rectangle_color: ctx.color_scheme.dark_foreground.as_values(),
             dimensions: [quad_dimensions.x, quad_dimensions.y],
             height_scale: 1.0f32,
             do_shadow: 0

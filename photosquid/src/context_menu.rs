@@ -1,4 +1,4 @@
-use crate::{aabb::AABB, color::Color, matrix::reach_inside_mat4, render_ctx::RenderCtx, text_helpers};
+use crate::{aabb::AABB, as_values::AsValues, color::Color, render_ctx::RenderCtx, text_helpers};
 use glium::glutin::event::MouseButton;
 use glium_text_rusttype::{FontTexture, TextDisplay, TextSystem};
 use nalgebra_glm as glm;
@@ -74,10 +74,10 @@ impl ContextMenu {
             let transformation = glm::scale(&transformation, &glm::vec3(quad_dimensions.x * 0.5, quad_dimensions.y * 0.5, 0.0));
 
             let uniforms = glium::uniform! {
-                transformation: reach_inside_mat4(&transformation),
-                view: reach_inside_mat4(&identity),
-                projection: reach_inside_mat4(ctx.projection),
-                rectangle_color: Into::<[f32; 4]>::into(self.background_color),
+                transformation: transformation.as_values(),
+                view: identity.as_values(),
+                projection: ctx.projection.as_values(),
+                rectangle_color: self.background_color.as_values(),
                 dimensions: [quad_dimensions.x, quad_dimensions.y],
                 height_scale: 1.0f32,
                 do_shadow: 1

@@ -9,8 +9,8 @@ use crate::{
     capture::Capture,
     data::RectData,
     interaction::{ClickInteraction, DragInteraction, Interaction, MouseReleaseInteraction},
-    math_helpers::DivOrZero,
-    matrix_helpers,
+    math::DivOrZero,
+    matrix,
     mesh::MeshXyz,
     render_ctx::RenderCtx,
     smooth::Smooth,
@@ -243,15 +243,15 @@ pub fn render(rect: &mut Rect, ctx: &mut RenderCtx, as_preview: Option<PreviewPa
     }
 
     let raw_view = if as_preview.is_some() {
-        matrix_helpers::reach_inside_mat4(&glm::identity::<f32, 4>())
+        matrix::reach_inside_mat4(&glm::identity::<f32, 4>())
     } else {
-        matrix_helpers::reach_inside_mat4(ctx.view)
+        matrix::reach_inside_mat4(ctx.view)
     };
 
     let uniforms = glium::uniform! {
-        transformation: matrix_helpers::reach_inside_mat4(&transformation),
+        transformation: matrix::reach_inside_mat4(&transformation),
         view: raw_view,
-        projection: matrix_helpers::reach_inside_mat4(ctx.projection),
+        projection: matrix::reach_inside_mat4(ctx.projection),
         color: Into::<[f32; 4]>::into(color.0)
     };
 

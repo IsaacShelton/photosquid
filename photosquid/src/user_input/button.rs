@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{app::App, color::Color, matrix_helpers::reach_inside_mat4, text_helpers};
+use crate::{app::App, color::Color, matrix::reach_inside_mat4, text_helpers};
 use glium::glutin::event::MouseButton;
 use glium_text_rusttype::{FontTexture, TextDisplay, TextSystem};
 use nalgebra_glm as glm;

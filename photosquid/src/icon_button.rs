@@ -1,4 +1,4 @@
-use crate::{color::Color, matrix_helpers::reach_inside_mat4, mesh::MeshXyz, press_animation::PressAnimation, render_ctx::RenderCtx, smooth::Smooth};
+use crate::{color::Color, matrix::reach_inside_mat4, mesh::MeshXyz, press_animation::PressAnimation, render_ctx::RenderCtx, smooth::Smooth};
 use angular_units::Angle;
 use glium::Display;
 use nalgebra_glm as glm;

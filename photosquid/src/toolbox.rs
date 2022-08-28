@@ -2,7 +2,7 @@ use crate::{
     capture::Capture,
     color::Color,
     interaction::{ClickInteraction, DragInteraction, Interaction},
-    matrix_helpers::reach_inside_mat4,
+    matrix::reach_inside_mat4,
     mesh::MeshXyz,
     ocean::Ocean,
     options,

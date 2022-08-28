@@ -8,7 +8,6 @@ use crate::{
     history::History,
     interaction::{Interaction, KeyInteraction},
     interaction_options::InteractionOptions,
-    linear_set::LinearSet,
     mesh::{MeshXyz, MeshXyzUv},
     ocean::Ocean,
     operation::Operation,
@@ -31,7 +30,13 @@ use glium::{
 use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;
 use slotmap::SlotMap;
-use std::{collections::btree_set::BTreeSet, fs, path::PathBuf, rc::Rc, time::Instant};
+use std::{
+    collections::{btree_set::BTreeSet, HashSet},
+    fs,
+    path::PathBuf,
+    rc::Rc,
+    time::Instant,
+};
 
 pub const MULTISAMPLING_COUNT: u16 = 4;
 
@@ -56,7 +61,7 @@ pub struct App {
     pub dragging: Option<Dragging>,
     pub selections: Vec<Selection>,
     pub keys_held: BTreeSet<VirtualKeyCode>,
-    pub mouse_buttons_held: LinearSet<MouseButton>,
+    pub mouse_buttons_held: HashSet<MouseButton>,
     pub modifiers_held: ModifiersState,
     pub text_system: TextSystem,
     pub font: Rc<FontTexture>,

@@ -1,4 +1,4 @@
-use crate::math_helpers::AsAngle;
+use crate::math::AsAngle;
 use angular_units::{Angle, Interpolate};
 use nalgebra_glm as glm;
 

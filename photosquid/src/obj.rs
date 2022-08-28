@@ -1,7 +1,7 @@
 use crate::vertex::Vertex;
 use stringreader::StringReader;
 
-pub fn obj_data_to_shape(data: &str) -> Vec<Vertex> {
+pub fn data_to_vertices(data: &str) -> Vec<Vertex> {
     let (models, _materials) = tobj::load_obj_buf(
         &mut std::io::BufReader::new(StringReader::new(data)),
         &tobj::LoadOptions {

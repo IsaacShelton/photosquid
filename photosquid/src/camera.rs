@@ -52,7 +52,7 @@ impl Camera {
 
     // Sizes / Distances
     pub fn apply_reverse_to_scale(&self, object_scale: f32) -> f32 {
-        use crate::math_helpers::DivOrZero;
+        use crate::math::DivOrZero;
         object_scale.div_or_zero(self.zoom)
     }
 

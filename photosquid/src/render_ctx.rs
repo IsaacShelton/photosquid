@@ -1,7 +1,7 @@
 use crate::{
     camera::Camera,
+    clearable::Clearable,
     color::Color,
-    color_impls::Clearable,
     color_scheme::ColorScheme,
     mesh::{MeshXyz, MeshXyzUv},
 };

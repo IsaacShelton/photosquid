@@ -1,6 +1,6 @@
 use crate::{
-    aabb::AABB, capture::Capture, color::Color, icon_button::IconButton, matrix_helpers::reach_inside_mat4, press_animation::PressAnimation,
-    render_ctx::RenderCtx, smooth::Smooth, text_helpers,
+    aabb::AABB, capture::Capture, color::Color, icon_button::IconButton, matrix::reach_inside_mat4, press_animation::PressAnimation, render_ctx::RenderCtx,
+    smooth::Smooth, text_helpers,
 };
 use glium::glutin::event::MouseButton;
 use glium_text_rusttype::{FontTexture, TextDisplay, TextSystem};

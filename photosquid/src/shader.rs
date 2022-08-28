@@ -4,7 +4,7 @@ use glium::{
     Program,
 };
 
-pub fn shader_from_source_that_outputs_srgb<'a, F: ?Sized>(
+pub fn from_code_that_outputs_srgb<'a, F: ?Sized>(
     facade: &F,
     vertex_shader: &'a str,
     fragment_shader: &'a str,

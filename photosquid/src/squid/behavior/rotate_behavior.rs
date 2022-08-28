@@ -1,4 +1,4 @@
-use crate::{accumulator::Accumulator, camera::Camera, math_helpers::angle_difference};
+use crate::{accumulator::Accumulator, camera::Camera, math::angle_difference};
 use angular_units::Rad;
 use nalgebra_glm as glm;
 

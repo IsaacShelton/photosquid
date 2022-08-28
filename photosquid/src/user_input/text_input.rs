@@ -2,7 +2,7 @@ use crate::{
     aabb::AABB,
     capture::{Capture, KeyCapture},
     color::Color,
-    matrix_helpers::reach_inside_mat4,
+    matrix::reach_inside_mat4,
     render_ctx::RenderCtx,
     text_helpers,
 };

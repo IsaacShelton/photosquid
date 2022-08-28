@@ -1,8 +1,8 @@
 use crate::{
     color::Color,
     data::rect::BorderRadii,
-    matrix_helpers::reach_inside_mat4,
-    obj_helpers,
+    matrix::reach_inside_mat4,
+    obj,
     render_ctx::RenderCtx,
     vertex::{Vertex, VertexXYUV},
 };
@@ -30,13 +30,14 @@ pub struct MeshXyz {
 
 impl MeshXyz {
     pub fn new(obj_src_code: &str, display: &Display) -> Self {
-        let shape = obj_helpers::obj_data_to_shape(obj_src_code);
+        let shape = obj::data_to_vertices(obj_src_code);
         Self::from_vertices(&shape, display)
     }
 
     pub fn from_vertices(vertices: &[Vertex], display: &Display) -> Self {
         let vertex_buffer = VertexBuffer::new(display, vertices).unwrap();
         let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
+
         Self {
             vertex_buffer,
             indices: MeshIndices::None(indices),
@@ -67,12 +68,12 @@ impl MeshXyz {
     }
 
     pub fn new_ui_ring(display: &glium::Display) -> Self {
-        let shape = obj_helpers::obj_data_to_shape(include_str!("_src_objs/ring.obj"));
+        let shape = obj::data_to_vertices(include_str!("_src_objs/ring.obj"));
         Self::from_vertices(&shape, display)
     }
 
     pub fn new_ui_check(display: &glium::Display) -> Self {
-        let shape = obj_helpers::obj_data_to_shape(include_str!("_src_objs/check.obj"));
+        let shape = obj::data_to_vertices(include_str!("_src_objs/check.obj"));
         Self::from_vertices(&shape, display)
     }
 

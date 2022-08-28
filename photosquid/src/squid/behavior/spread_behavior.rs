@@ -10,7 +10,7 @@ pub struct SpreadBehavior {
 impl SpreadBehavior {
     // Returns new absolute position
     pub fn express(&self, current: &glm::Vec2) -> glm::Vec2 {
-        use crate::math_helpers::DivOrZero;
+        use crate::math::DivOrZero;
         let origin = &self.origin;
         let start = &self.start;
         let angle = (start.y - origin.y).atan2(start.x - origin.x);

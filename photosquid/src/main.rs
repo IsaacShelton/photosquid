@@ -16,8 +16,8 @@ mod approx_instant;
 mod bool_poll;
 mod camera;
 mod capture;
+mod clearable;
 mod color;
-mod color_impls;
 mod color_scheme;
 mod context_menu;
 mod data;
@@ -28,11 +28,10 @@ mod icon_button;
 mod interaction;
 mod interaction_options;
 mod layer;
-mod linear_set;
-mod math_helpers;
-mod matrix_helpers;
+mod math;
+mod matrix;
 mod mesh;
-mod obj_helpers;
+mod obj;
 mod ocean;
 mod operation;
 mod options;
@@ -40,7 +39,7 @@ mod press_animation;
 mod raster_color;
 mod render_ctx;
 mod selection;
-mod shader_helpers;
+mod shader;
 mod shaders;
 mod smooth;
 mod squid;
@@ -79,14 +78,14 @@ use slotmap::SlotMap;
 use smooth::Smooth;
 use squid::SquidRef;
 use std::{
-    collections::btree_set::BTreeSet,
+    collections::{btree_set::BTreeSet, HashSet},
     rc::Rc,
     time::{Duration, Instant},
 };
 use tool::{Tool, ToolKey, ToolKind};
 use toolbox::ToolBox;
 
-use crate::{interaction::ClickInteraction, linear_set::LinearSet, toolbox::find_tool};
+use crate::{interaction::ClickInteraction, toolbox::find_tool};
 
 fn main() {
     // <コ:彡
@@ -162,7 +161,7 @@ fn main() {
         dragging: None,
         selections: vec![],
         keys_held: BTreeSet::new(),
-        mouse_buttons_held: LinearSet::new(),
+        mouse_buttons_held: HashSet::new(),
         modifiers_held: ModifiersState::empty(),
         text_system,
         font: Rc::new(font),
@@ -361,7 +360,7 @@ fn render_television(target: &mut glium::Frame, rendered: &glium::texture::SrgbT
     // Draw render to window
 
     use glium::Surface;
-    use matrix_helpers::reach_inside_mat4;
+    use matrix::reach_inside_mat4;
 
     let identity = glm::identity::<f32, 4>();
 

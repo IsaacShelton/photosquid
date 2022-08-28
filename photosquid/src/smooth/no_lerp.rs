@@ -9,7 +9,6 @@ impl<T: Lerpable + Copy> Lerpable for NoLerp<T> {
     type Scalar = T::Scalar;
 
     fn lerp(&self, other: &Self, _scalar: Self::Scalar) -> Self {
-        // Don't do lerping shape color changes
-        *other
+        *other // Don't do lerping for NoLerp<T> values
     }
 }

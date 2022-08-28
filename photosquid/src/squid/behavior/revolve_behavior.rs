@@ -1,4 +1,4 @@
-use crate::{accumulator::Accumulator, interaction_options::InteractionOptions, math_helpers::angle_difference};
+use crate::{accumulator::Accumulator, interaction_options::InteractionOptions, math::angle_difference};
 use angular_units::{Angle, Rad};
 use nalgebra_glm as glm;
 
@@ -21,7 +21,7 @@ pub struct Expression {
 
 impl Expression {
     pub fn apply_origin_rotation_to_center(&self) -> glm::Vec2 {
-        use crate::math_helpers::AsAngle;
+        use crate::math::AsAngle;
         let distance = glm::distance(&self.origin, &self.start);
         let object_angle = (self.start - self.origin).as_angle() - self.origin_rotation;
         self.origin + distance * glm::vec2(object_angle.cos(), object_angle.sin())
@@ -31,7 +31,7 @@ impl Expression {
 impl RevolveBehavior {
     // Returns origin point to rotate around a certain amount
     pub fn express(&mut self, current: &glm::Vec2, options: &InteractionOptions) -> Option<Expression> {
-        use crate::math_helpers::AsAngle;
+        use crate::math::AsAngle;
 
         if !self.revolving {
             None

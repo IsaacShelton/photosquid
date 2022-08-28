@@ -3,7 +3,7 @@ use crate::{
     bool_poll::BoolPoll,
     capture::{Capture, KeyCapture},
     interaction::{ClickInteraction, DragInteraction, Interaction, KeyInteraction},
-    math_helpers::get_point_delta_rotation,
+    math::get_point_delta_rotation,
     operation::Operation,
     selection::{NewSelection, TrySelectResult},
     squid::Initiation,

@@ -1,4 +1,4 @@
-use crate::shader_helpers;
+use crate::shader;
 
 pub struct Shaders {
     pub color_shader: glium::Program,
@@ -10,9 +10,9 @@ pub struct Shaders {
 
 impl Shaders {
     pub fn new(display: &glium::Display) -> Self {
-        use shader_helpers::shader_from_source_that_outputs_srgb;
+        use shader::from_code_that_outputs_srgb;
 
-        let color_shader = shader_from_source_that_outputs_srgb(
+        let color_shader = from_code_that_outputs_srgb(
             display,
             include_str!("_src_shaders/color/vertex.glsl"),
             include_str!("_src_shaders/color/fragment.glsl"),
@@ -21,7 +21,7 @@ impl Shaders {
         )
         .unwrap();
 
-        let hue_value_picker_shader = shader_from_source_that_outputs_srgb(
+        let hue_value_picker_shader = from_code_that_outputs_srgb(
             display,
             include_str!("_src_shaders/color_picker/hue_value/vertex.glsl"),
             include_str!("_src_shaders/color_picker/hue_value/fragment.glsl"),
@@ -30,7 +30,7 @@ impl Shaders {
         )
         .unwrap();
 
-        let saturation_picker_shader = shader_from_source_that_outputs_srgb(
+        let saturation_picker_shader = from_code_that_outputs_srgb(
             display,
             include_str!("_src_shaders/color_picker/saturation/vertex.glsl"),
             include_str!("_src_shaders/color_picker/saturation/fragment.glsl"),
@@ -39,7 +39,7 @@ impl Shaders {
         )
         .unwrap();
 
-        let rounded_rectangle_shader = shader_from_source_that_outputs_srgb(
+        let rounded_rectangle_shader = from_code_that_outputs_srgb(
             display,
             include_str!("_src_shaders/rounded_rectangle/vertex.glsl"),
             include_str!("_src_shaders/rounded_rectangle/fragment.glsl"),
@@ -48,7 +48,7 @@ impl Shaders {
         )
         .unwrap();
 
-        let television_shader = shader_from_source_that_outputs_srgb(
+        let television_shader = from_code_that_outputs_srgb(
             display,
             include_str!("_src_shaders/texture/vertex.glsl"),
             include_str!("_src_shaders/texture/fragment.glsl"),
@@ -56,6 +56,7 @@ impl Shaders {
             false,
         )
         .unwrap();
+
         Self {
             color_shader,
             hue_value_picker_shader,

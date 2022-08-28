@@ -8,3 +8,4 @@ ignore
 *.ignore
 .commit
 photosquid.obj
+photosquid/src/rotation

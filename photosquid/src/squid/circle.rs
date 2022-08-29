@@ -96,6 +96,7 @@ pub fn interact(circle: &mut Circle, interaction: &Interaction, camera: &Camera)
         Interaction::Click(ClickInteraction {
             button: MouseButton::Left,
             position,
+            ..
         }) => {
             let rotate_handle_location = get_rotate_handle(circle, camera);
             if glm::distance(position, &rotate_handle_location) <= HANDLE_RADIUS * 2.0 {

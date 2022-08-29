@@ -151,7 +151,7 @@ impl Tool {
 
     fn interact_options_impl(&mut self, interaction: Interaction, app: &mut App) -> Capture {
         match interaction {
-            Interaction::Click(ClickInteraction { button, position }) => {
+            Interaction::Click(ClickInteraction { button, position, .. }) => {
                 let index_took_focus = self.user_inputs.iter_mut().enumerate().find_map(|(i, user_input)| {
                     if user_input.click(button, &position, &get_nth_input_area(i), app) == Capture::TakeFocus {
                         Some(i)

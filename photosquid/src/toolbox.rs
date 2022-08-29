@@ -153,7 +153,7 @@ impl ToolBox {
     }
 
     pub fn click(&mut self, interaction: Interaction, screen_width: f32, screen_height: f32) -> Capture {
-        let ClickInteraction { button, position: mouse } = interaction.as_click().unwrap();
+        let ClickInteraction { button, position: mouse, .. } = interaction.as_click().unwrap();
 
         // Tool ribbon
         if *button == MouseButton::Left && mouse.x < self.width {

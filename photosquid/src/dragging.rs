@@ -1,5 +1,5 @@
 use crate::interaction::{DragInteraction, Interaction};
-use glium::glutin::dpi::LogicalPosition;
+use glium::glutin::{dpi::LogicalPosition, event::ModifiersState};
 use nalgebra_glm as glm;
 
 pub struct Dragging {
@@ -28,11 +28,12 @@ impl Dragging {
         self.current - self.last
     }
 
-    pub fn to_interaction(&self) -> Interaction {
+    pub fn to_interaction(&self, modifiers: ModifiersState) -> Interaction {
         Interaction::Drag(DragInteraction {
             delta: self.get_delta(),
             start: self.down,
             current: self.current,
+            modifiers,
         })
     }
 }

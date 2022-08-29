@@ -20,6 +20,7 @@ mod clearable;
 mod color;
 mod color_scheme;
 mod context_menu;
+mod ctrl_or_cmd;
 mod data;
 mod dialog;
 mod dragging;
@@ -30,6 +31,7 @@ mod interaction_options;
 mod layer;
 mod math;
 mod mesh;
+mod mouse;
 mod obj;
 mod ocean;
 mod operation;
@@ -51,8 +53,8 @@ mod vertex;
 
 const TARGET_FPS: u64 = 60;
 
-use crate::as_values::AsValues;
 use app::{App, MULTISAMPLING_COUNT};
+use as_values::AsValues;
 use camera::Camera;
 use capture::Capture;
 use color_scheme::ColorScheme;
@@ -70,6 +72,7 @@ use glium::{
 use glium_text_rusttype as glium_text;
 use interaction::{Interaction, MouseReleaseInteraction};
 use mesh::{MeshXyz, MeshXyzUv};
+use mouse::OnScreen;
 use nalgebra_glm as glm;
 use render_ctx::RenderCtx;
 use selection::selection_contains;
@@ -205,6 +208,15 @@ fn main() {
     });
 }
 
+fn on_modifiers_changed(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>, value: ModifiersState) {
+    app.modifiers_held = value;
+
+    if app.dragging.is_some() {
+        let capture = do_drag(app, tools);
+        app.do_capture(capture)
+    }
+}
+
 fn on_event(
     abstract_event: glium::glutin::event::Event<()>,
     app: &mut App,
@@ -215,7 +227,7 @@ fn on_event(
         AbstractWindowEvent { event, .. } => match event {
             ConcreteWindowEvent::CloseRequested => return Some(ControlFlow::Exit),
             ConcreteWindowEvent::KeyboardInput { input, .. } => on_keyboard_input(app, tools, input),
-            ConcreteWindowEvent::ModifiersChanged(value) => app.modifiers_held = value,
+            ConcreteWindowEvent::ModifiersChanged(value) => on_modifiers_changed(app, tools, value),
             ConcreteWindowEvent::MouseInput { state, button, .. } => on_mouse_input(app, tools, options_tabs, state, button),
             ConcreteWindowEvent::CursorMoved { position, .. } => on_mouse_move(app, tools, position),
             ConcreteWindowEvent::ScaleFactorChanged { scale_factor, .. } => app.scale_factor = scale_factor,
@@ -430,7 +442,11 @@ fn do_click(
     // Context Menu
     do_click_context_menu(app, button, &position)?;
 
-    let interaction = Interaction::Click(ClickInteraction { button, position });
+    let interaction = Interaction::Click(ClickInteraction {
+        button,
+        position,
+        modifiers: app.modifiers_held,
+    });
 
     // Tool options ribbon
     if let Some(tool_key) = app.toolbox.get_selected() {
@@ -478,7 +494,7 @@ fn do_mouse_release(app: &mut App, button: MouseButton) {
 }
 
 fn do_drag(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>) -> Capture {
-    let drag = app.dragging.as_ref().unwrap().to_interaction();
+    let drag = app.dragging.as_ref().unwrap().to_interaction(app.modifiers_held);
     let [width, _]: [f32; 2] = app.dimensions.into();
 
     app.toolbox.drag(MouseButton::Left, &drag, width)?;
@@ -527,7 +543,7 @@ fn on_mouse_input(
             Capture::NoDrag => (),
             capture => {
                 app.dragging = Some(Dragging::new(app.mouse_position.unwrap_or_default()));
-                app.handle_captured(&capture, &app.camera.get_animated());
+                app.do_capture(capture);
             }
         }
     } else {
@@ -543,11 +559,10 @@ fn on_mouse_move(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>, position: gl
     app.mouse_position = Some(position.to_logical(app.scale_factor));
 
     if let Some(dragging) = app.dragging.as_mut() {
-        let logical_position = app.mouse_position.unwrap();
-        dragging.update(glm::vec2(logical_position.x, logical_position.y));
+        dragging.update(app.mouse_position.unwrap().on_screen());
 
         let capture = do_drag(app, tools);
-        app.handle_captured(&capture, &app.camera.get_animated());
+        app.do_capture(capture);
     }
 }
 

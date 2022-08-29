@@ -73,6 +73,7 @@ impl Squid {
                 mesh: None,
                 data: Smooth::new(data, None),
                 moving_corner: None,
+                opposite_corner_position: None,
                 translate_behavior: Default::default(),
                 rotating: false,
                 rotation_accumulator: Accumulator::new(),
@@ -158,7 +159,7 @@ impl Squid {
     // Renders squid in regular state
     pub fn render(&mut self, ctx: &mut RenderCtx, as_preview: Option<PreviewParams>) {
         match &mut self.data {
-            SquidData::Rect(rect) => rect::render(rect, ctx, as_preview),
+            SquidData::Rect(rect) => rect.render(ctx, as_preview),
             SquidData::Circle(circle) => circle::render(circle, ctx, as_preview),
             SquidData::Tri(tri) => tri::render(tri, ctx, as_preview),
         }
@@ -171,9 +172,9 @@ impl Squid {
             SquidData::Rect(rect) => {
                 let RectData { position, .. } = rect.data.get_animated();
                 output.push(camera.apply(&position.reveal()));
-                output.push(rect::get_rotate_handle(rect, camera));
+                output.push(rect.get_rotate_handle(camera));
 
-                for corner in rect::get_relative_corners(rect) {
+                for corner in rect.get_relative_corners() {
                     output.push(camera.apply(&(position.reveal() + corner)));
                 }
             }
@@ -200,7 +201,7 @@ impl Squid {
     // Returns if and how the interaction was captured
     pub fn interact(&mut self, interaction: &Interaction, camera: &Camera, _options: &InteractionOptions) -> Capture {
         match &mut self.data {
-            SquidData::Rect(rect) => rect::interact(rect, interaction, camera),
+            SquidData::Rect(rect) => rect.interact(interaction, camera),
             SquidData::Circle(circle) => circle::interact(circle, interaction, camera),
             SquidData::Tri(tri) => tri::interact(tri, interaction, camera),
         }
@@ -399,7 +400,7 @@ impl Squid {
     pub fn try_select(&self, underneath: glm::Vec2, camera: &Camera, self_reference: SquidRef) -> Option<NewSelection> {
         match &self.data {
             SquidData::Rect(rect) => {
-                if rect::is_point_over(rect, underneath, camera) {
+                if rect.is_point_over(underneath, camera) {
                     return Some(NewSelection {
                         selection: Selection::new(self_reference, None),
                         info: NewSelectionInfo {
@@ -442,7 +443,7 @@ impl Squid {
 
     pub fn is_point_over(&self, mouse_position: glm::Vec2, camera: &Camera) -> bool {
         match &self.data {
-            SquidData::Rect(rect) => rect::is_point_over(rect, mouse_position, camera),
+            SquidData::Rect(rect) => rect.is_point_over(mouse_position, camera),
             SquidData::Circle(circle) => circle::is_point_over(circle, mouse_position, camera),
             SquidData::Tri(tri) => tri::is_point_over(tri, mouse_position, camera),
         }
@@ -608,8 +609,8 @@ impl Squid {
     pub fn get_opaque_handles(&self) -> Vec<glm::Vec2> {
         match &self.data {
             SquidData::Rect(rect) => {
-                let mut handles = rect::get_relative_corners(rect);
-                handles.push(rect::get_rotate_handle(rect, &IDENTITY_CAMERA));
+                let mut handles = rect.get_relative_corners();
+                handles.push(rect.get_rotate_handle(&IDENTITY_CAMERA));
                 handles
             }
             SquidData::Circle(circle) => {

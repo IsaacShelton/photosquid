@@ -3,6 +3,7 @@ use crate::{
     capture::Capture,
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
+    ctrl_or_cmd::CtrlOrCmd,
     dialog::{ask_open, ask_save},
     dragging::Dragging,
     history::History,
@@ -73,20 +74,6 @@ pub struct App {
     pub filename: Option<PathBuf>,
 }
 
-trait ControlOrCommand {
-    fn control_or_command(&self) -> bool;
-}
-
-impl ControlOrCommand for ModifiersState {
-    fn control_or_command(&self) -> bool {
-        if cfg!(target_os = "macos") {
-            self.logo()
-        } else {
-            self.ctrl()
-        }
-    }
-}
-
 impl App {
     // Tries to interact with any already selected squids
     // Returns whether interaction was captured
@@ -137,7 +124,7 @@ impl App {
     pub fn press_key(&mut self, key: VirtualKeyCode, tools: &mut SlotMap<ToolKey, Tool>) {
         use crate::camera::EasySmoothCamera;
 
-        if self.modifiers_held.control_or_command() {
+        if self.modifiers_held.ctrl_or_cmd() {
             let shift = self.modifiers_held.shift();
 
             match key {
@@ -205,7 +192,7 @@ impl App {
         self.display.gl_window().window().set_cursor_icon(cursor);
     }
 
-    pub fn handle_captured(&mut self, capture: &Capture, _camera: &Camera) {
+    pub fn do_capture(&mut self, capture: Capture) {
         match capture {
             Capture::Miss => (),
             Capture::AllowDrag => (),
@@ -215,42 +202,42 @@ impl App {
             Capture::MoveSelectedSquids { delta_in_world } => {
                 for squid_id in self.get_selected_squids() {
                     if let Some(squid) = self.ocean.get_mut(squid_id) {
-                        squid.translate(delta_in_world, &self.interaction_options);
+                        squid.translate(&delta_in_world, &self.interaction_options);
                     }
                 }
             }
             Capture::RotateSelectedSquids { delta_theta } => {
                 for squid_id in self.get_selected_squids() {
                     if let Some(squid) = self.ocean.get_mut(squid_id) {
-                        squid.rotate(*delta_theta, &self.interaction_options);
+                        squid.rotate(delta_theta, &self.interaction_options);
                     }
                 }
             }
             Capture::ScaleSelectedSquids { total_scale_factor } => {
                 for squid_id in self.get_selected_squids() {
                     if let Some(squid) = self.ocean.get_mut(squid_id) {
-                        squid.scale(*total_scale_factor, &self.interaction_options);
+                        squid.scale(total_scale_factor, &self.interaction_options);
                     }
                 }
             }
             Capture::SpreadSelectedSquids { current } => {
                 for squid_id in self.get_selected_squids() {
                     if let Some(squid) = self.ocean.get_mut(squid_id) {
-                        squid.spread(current, &self.interaction_options);
+                        squid.spread(&current, &self.interaction_options);
                     }
                 }
             }
             Capture::RevolveSelectedSquids { current } => {
                 for squid_id in self.get_selected_squids() {
                     if let Some(squid) = self.ocean.get_mut(squid_id) {
-                        squid.revolve(current, &self.interaction_options);
+                        squid.revolve(&current, &self.interaction_options);
                     }
                 }
             }
             Capture::DilateSelectedSquids { current } => {
                 for squid_id in self.get_selected_squids() {
                     if let Some(squid) = self.ocean.get_mut(squid_id) {
-                        squid.dilate(current, &self.interaction_options);
+                        squid.dilate(&current, &self.interaction_options);
                     }
                 }
             }

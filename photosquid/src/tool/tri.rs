@@ -14,6 +14,7 @@ pub fn interact(user_inputs: &mut Vec<UserInput>, interaction: Interaction, app:
         Interaction::Click(ClickInteraction {
             button: MouseButton::Left,
             position: click_coords,
+            ..
         }) => {
             let camera = app.camera.get_animated();
             let world_position = camera.apply_reverse(&click_coords);

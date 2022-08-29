@@ -200,6 +200,7 @@ pub fn interact(tri: &mut Tri, interaction: &Interaction, camera: &Camera) -> Ca
         Interaction::Click(ClickInteraction {
             button: MouseButton::Left,
             position,
+            ..
         }) => {
             for (i, corner) in get_animated_screen_points(tri, camera).iter().enumerate() {
                 if glm::distance(position, corner) <= HANDLE_RADIUS * 2.0 {

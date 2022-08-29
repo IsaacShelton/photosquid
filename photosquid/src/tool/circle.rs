@@ -12,6 +12,7 @@ pub fn interact(user_inputs: &mut Vec<UserInput>, interaction: Interaction, app:
         Interaction::Click(ClickInteraction {
             button: MouseButton::Left,
             position,
+            ..
         }) => {
             let world_position = app.camera.get_animated().apply_reverse(&position);
             let color = app.toolbox.color_picker.calculate_color();

@@ -23,8 +23,9 @@ pub fn interact(user_inputs: &mut Vec<UserInput>, interaction: Interaction, app:
             let height = user_inputs[1].as_text_input_mut().unwrap().text().parse::<f32>().unwrap_or_default().max(4.0);
             let rotation = Rad(user_inputs[2].as_text_input_mut().unwrap().text().parse::<f32>().unwrap_or_default() * std::f32::consts::PI / 180.0);
             let radii = user_inputs[3].as_text_input_mut().unwrap().text().parse::<f32>().unwrap_or_default();
+            let is_viewport = user_inputs[4].as_checkbox_mut().unwrap().checked();
 
-            app.insert(Squid::rect(world_position, glm::vec2(width, height), rotation, color, radii));
+            app.insert(Squid::rect(world_position, glm::vec2(width, height), rotation, color, radii, is_viewport));
             Capture::AllowDrag
         }
         _ => Capture::Miss,

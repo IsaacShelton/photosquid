@@ -18,17 +18,17 @@ pub struct IconButton<T> {
 }
 
 impl<T> IconButton<T> {
-    pub fn new(obj_src_code: &str, animation: PressAnimation, key: T, display: &Display) -> Self {
-        Self::new_from_mesh(MeshXyz::new(obj_src_code, display), animation, key)
+    pub fn new(obj_src_code: &str, animation: PressAnimation, key: T, display: &Display, duration: Option<Duration>) -> Self {
+        Self::new_from_mesh(MeshXyz::new(obj_src_code, display), animation, duration, key)
     }
 
-    pub fn new_from_mesh(mesh: MeshXyz, animation: PressAnimation, key: T) -> Self {
+    pub fn new_from_mesh(mesh: MeshXyz, animation: PressAnimation, duration: Option<Duration>, key: T) -> Self {
         Self {
             mesh,
             position: glm::vec3(0.0, 0.0, 0.0),
             relative_scale: 1.0,
             instant: None,
-            duration: Duration::from_millis(1000),
+            duration: duration.unwrap_or_else(|| Duration::from_millis(1000)),
             animation,
             focused: false,
             key,

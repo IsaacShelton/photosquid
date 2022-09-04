@@ -3,7 +3,7 @@ mod circle;
 mod rect;
 mod tri;
 
-use self::behavior::{DilateBehavior, SpreadBehavior, TranslateBehavior};
+use self::behavior::TranslateBehavior;
 use crate::{
     accumulator::Accumulator,
     algorithm::get_triangle_center,
@@ -53,13 +53,14 @@ pub struct Squid {
 }
 
 impl Squid {
-    pub fn rect(position: glm::Vec2, size: glm::Vec2, rotation: Rad<f32>, color: Color, radii: f32) -> Self {
+    pub fn rect(position: glm::Vec2, size: glm::Vec2, rotation: Rad<f32>, color: Color, radii: f32, is_viewport: bool) -> Self {
         let data = RectData {
             position: MultiLerp::From(position),
             size,
             rotation,
             color: NoLerp(color),
             radii: BorderRadii::new(radii),
+            is_viewport,
         };
 
         Self::rect_from(data)
@@ -160,8 +161,8 @@ impl Squid {
     pub fn render(&mut self, ctx: &mut RenderCtx, as_preview: Option<PreviewParams>) {
         match &mut self.data {
             SquidData::Rect(rect) => rect.render(ctx, as_preview),
-            SquidData::Circle(circle) => circle::render(circle, ctx, as_preview),
-            SquidData::Tri(tri) => tri::render(tri, ctx, as_preview),
+            SquidData::Circle(circle) => circle.render(ctx, as_preview),
+            SquidData::Tri(tri) => tri.render(ctx, as_preview),
         }
     }
 
@@ -181,15 +182,15 @@ impl Squid {
             SquidData::Circle(circle) => {
                 let CircleData { position, .. } = circle.data.get_animated();
                 output.push(camera.apply(&position.reveal()));
-                output.push(circle::get_rotate_handle(circle, camera));
+                output.push(circle.get_rotate_handle(camera));
             }
             SquidData::Tri(tri) => {
                 let TriData { position, .. } = tri.data.get_animated();
 
                 output.push(camera.apply(&position.reveal()));
-                output.push(tri::get_rotate_handle(tri, camera));
+                output.push(tri.get_rotate_handle(camera));
 
-                for point in tri::get_animated_screen_points(tri, camera) {
+                for point in tri.get_animated_screen_points(camera) {
                     output.push(point);
                 }
             }
@@ -202,8 +203,8 @@ impl Squid {
     pub fn interact(&mut self, interaction: &Interaction, camera: &Camera, _options: &InteractionOptions) -> Capture {
         match &mut self.data {
             SquidData::Rect(rect) => rect.interact(interaction, camera),
-            SquidData::Circle(circle) => circle::interact(circle, interaction, camera),
-            SquidData::Tri(tri) => tri::interact(tri, interaction, camera),
+            SquidData::Circle(circle) => circle.interact(interaction, camera),
+            SquidData::Tri(tri) => tri.interact(interaction, camera),
         }
     }
 
@@ -404,27 +405,27 @@ impl Squid {
                     return Some(NewSelection {
                         selection: Selection::new(self_reference, None),
                         info: NewSelectionInfo {
-                            color: Some(rect.data.get_real().color.0),
+                            color: Some(*rect.data.get_real().color),
                         },
                     });
                 }
             }
             SquidData::Circle(circle) => {
-                if circle::is_point_over(circle, underneath, camera) {
+                if circle.is_point_over(underneath, camera) {
                     return Some(NewSelection {
                         selection: Selection::new(self_reference, None),
                         info: NewSelectionInfo {
-                            color: Some(circle.data.get_real().color.0),
+                            color: Some(*circle.data.get_real().color),
                         },
                     });
                 }
             }
             SquidData::Tri(tri) => {
-                if tri::is_point_over(tri, underneath, camera) {
+                if tri.is_point_over(underneath, camera) {
                     return Some(NewSelection {
                         selection: Selection::new(self_reference, None),
                         info: NewSelectionInfo {
-                            color: Some(tri.data.get_real().color.0),
+                            color: Some(*tri.data.get_real().color),
                         },
                     });
                 }
@@ -444,8 +445,8 @@ impl Squid {
     pub fn is_point_over(&self, mouse_position: glm::Vec2, camera: &Camera) -> bool {
         match &self.data {
             SquidData::Rect(rect) => rect.is_point_over(mouse_position, camera),
-            SquidData::Circle(circle) => circle::is_point_over(circle, mouse_position, camera),
-            SquidData::Tri(tri) => tri::is_point_over(tri, mouse_position, camera),
+            SquidData::Circle(circle) => circle.is_point_over(mouse_position, camera),
+            SquidData::Tri(tri) => tri.is_point_over(mouse_position, camera),
         }
     }
 
@@ -503,83 +504,9 @@ impl Squid {
     // Signals to the squid to initiate a certain user action
     pub fn initiate(&mut self, initiation: Initiation) {
         match &mut self.data {
-            SquidData::Rect(rect) => match initiation {
-                Initiation::Translate => {
-                    rect.translate_behavior.moving = true;
-                    rect.moving_corner = None;
-                }
-                Initiation::Rotate => (),
-                Initiation::Scale => {
-                    let real = rect.data.get_real();
-                    rect.prescale_size = real.size;
-                }
-                Initiation::Spread { point, center } => {
-                    rect.spread_behavior = SpreadBehavior {
-                        origin: center,
-                        start: rect.data.get_real().position.reveal(),
-                        point,
-                    };
-                }
-                Initiation::Dilate { point, center } => {
-                    let real = rect.data.get_real();
-                    rect.prescale_size = real.size;
-                    rect.dilate_behavior = DilateBehavior {
-                        point,
-                        origin: center,
-                        start: rect.data.get_real().position.reveal(),
-                    };
-                }
-                Initiation::Revolve { point, center } => rect.revolve_behavior.set(&center, &rect.data.get_real().position.reveal(), &point),
-            },
-            SquidData::Circle(circle) => match initiation {
-                Initiation::Translate => circle.translate_behavior.moving = true,
-                Initiation::Rotate => (),
-                Initiation::Scale => circle.prescale_size = circle.data.get_real().radius,
-                Initiation::Spread { point, center } => {
-                    circle.spread_behavior = SpreadBehavior {
-                        point,
-                        origin: center,
-                        start: circle.data.get_real().position.reveal(),
-                    };
-                }
-                Initiation::Revolve { point, center } => circle.revolve_behavior.set(&center, &circle.data.get_real().position.reveal(), &point),
-                Initiation::Dilate { point, center } => {
-                    circle.prescale_size = circle.data.get_real().radius;
-                    circle.dilate_behavior = DilateBehavior {
-                        point,
-                        origin: center,
-                        start: circle.data.get_real().position.reveal(),
-                    };
-                }
-            },
-            SquidData::Tri(tri) => match initiation {
-                Initiation::Translate => {
-                    tri.translate_behavior.moving = true;
-                    tri.moving_point = None;
-                }
-                Initiation::Rotate => (),
-                Initiation::Scale => {
-                    let real = tri.data.get_real();
-                    tri.prescale_size = [real.p1.reveal(), real.p2.reveal(), real.p3.reveal()];
-                }
-                Initiation::Spread { point, center } => {
-                    tri.spread_behavior = SpreadBehavior {
-                        point,
-                        origin: center,
-                        start: tri.data.get_real().position.reveal(),
-                    };
-                }
-                Initiation::Revolve { point, center } => tri.revolve_behavior.set(&center, &tri.data.get_real().position.reveal(), &point),
-                Initiation::Dilate { point, center } => {
-                    let real = tri.data.get_real();
-                    tri.prescale_size = [real.p1.reveal(), real.p2.reveal(), real.p3.reveal()];
-                    tri.dilate_behavior = DilateBehavior {
-                        point,
-                        origin: center,
-                        start: tri.data.get_real().position.reveal(),
-                    };
-                }
-            },
+            SquidData::Rect(rect) => rect.initiate(initiation),
+            SquidData::Circle(circle) => circle.initiate(initiation),
+            SquidData::Tri(tri) => tri.initiate(initiation),
         }
     }
 
@@ -594,8 +521,14 @@ impl Squid {
 
     // Opaque name getter/setter
     pub fn get_name(&self) -> &str {
-        self.name.as_deref().unwrap_or_else(|| match self.data {
-            SquidData::Rect(_) => "Unnamed Rect",
+        self.name.as_deref().unwrap_or_else(|| match &self.data {
+            SquidData::Rect(rect) => {
+                if rect.data.get_animated().is_viewport {
+                    "Unnamed Viewport"
+                } else {
+                    "Unnamed Rect"
+                }
+            }
             SquidData::Circle(_) => "Unnamed Circle",
             SquidData::Tri(_) => "Unnamed Tri",
         })
@@ -614,7 +547,7 @@ impl Squid {
                 handles
             }
             SquidData::Circle(circle) => {
-                vec![circle::get_rotate_handle(circle, &IDENTITY_CAMERA)]
+                vec![circle.get_rotate_handle(&IDENTITY_CAMERA)]
             }
             SquidData::Tri(tri) => {
                 let data = tri.data.get_animated();
@@ -623,7 +556,7 @@ impl Squid {
                     data.p1.reveal() + position,
                     data.p2.reveal() + position,
                     data.p3.reveal() + position,
-                    tri::get_rotate_handle(tri, &IDENTITY_CAMERA),
+                    tri.get_rotate_handle(&IDENTITY_CAMERA),
                 ]
             }
         }

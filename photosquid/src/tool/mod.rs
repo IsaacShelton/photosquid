@@ -14,7 +14,7 @@ use crate::{
     capture::{Capture, KeyCapture},
     interaction::{ClickInteraction, Interaction, KeyInteraction},
     render_ctx::RenderCtx,
-    user_input::{Button, TextInput, UserInput},
+    user_input::{Button, Checkbox, TextInput, UserInput},
 };
 use glium::glutin::event::VirtualKeyCode;
 use glium_text_rusttype::{FontTexture, TextSystem};
@@ -101,6 +101,7 @@ impl Tool {
                 UserInput::TextInput(TextInput::new("100".into(), "Initial Height".into(), "".into())),
                 UserInput::TextInput(TextInput::new("0".into(), "Initial Rotation".into(), " degrees".into())),
                 UserInput::TextInput(TextInput::new("0".into(), "Initial Corner Radii".into(), "".into())),
+                UserInput::Checkbox(Checkbox::new("Create Viewport".into(), false)),
             ],
         }
     }

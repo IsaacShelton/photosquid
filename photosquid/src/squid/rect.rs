@@ -1,6 +1,6 @@
 use super::{
     behavior::{self, DilateBehavior, RevolveBehavior, SpreadBehavior, TranslateBehavior},
-    PreviewParams, HANDLE_RADIUS,
+    Initiation, PreviewParams, HANDLE_RADIUS,
 };
 use crate::{
     accumulator::Accumulator,
@@ -8,6 +8,7 @@ use crate::{
     as_values::AsValues,
     camera::Camera,
     capture::Capture,
+    components,
     data::RectData,
     interaction::{ClickInteraction, DragInteraction, Interaction, MouseReleaseInteraction},
     math::DivOrZero,
@@ -108,14 +109,11 @@ impl From<Corner> for usize {
 impl Rect {
     pub fn get_rotate_handle(&self, camera: &Camera) -> glm::Vec2 {
         let RectData { position, size, rotation, .. } = self.data.get_animated();
-        let w = size.x;
 
-        let world_position = glm::vec2(
-            position.reveal().x + rotation.cos() * (w * 0.5 + 24.0 * w.signum()),
-            position.reveal().y - rotation.sin() * (w * 0.5 + 24.0 * w.signum()),
-        );
+        let width = size.x;
+        let distance = width * 0.5 + 24.0 * width.signum();
 
-        camera.apply(&world_position)
+        components::get_rotate_handle(position.reveal(), rotation, distance, camera)
     }
 
     pub fn get_relative_corners(&self) -> Vec<glm::Vec2> {
@@ -265,57 +263,93 @@ impl Rect {
         Capture::Miss
     }
 
+    pub fn initiate(&mut self, initiation: Initiation) {
+        match initiation {
+            Initiation::Translate => {
+                self.translate_behavior.moving = true;
+                self.moving_corner = None;
+            }
+            Initiation::Rotate => (),
+            Initiation::Scale => {
+                let real = self.data.get_real();
+                self.prescale_size = real.size;
+            }
+            Initiation::Spread { point, center } => {
+                self.spread_behavior = SpreadBehavior {
+                    origin: center,
+                    start: self.data.get_real().position.reveal(),
+                    point,
+                };
+            }
+            Initiation::Dilate { point, center } => {
+                let real = self.data.get_real();
+                self.prescale_size = real.size;
+                self.dilate_behavior = DilateBehavior {
+                    point,
+                    origin: center,
+                    start: self.data.get_real().position.reveal(),
+                };
+            }
+            Initiation::Revolve { point, center } => self.revolve_behavior.set(&center, &self.data.get_real().position.reveal(), &point),
+        }
+    }
+
     pub fn render(&mut self, ctx: &mut RenderCtx, as_preview: Option<PreviewParams>) {
         let RectData {
             position,
             size,
             rotation,
             color,
+            is_viewport,
             ..
         } = self.data.get_animated();
 
-        // Refresh mesh
-        {
-            let real = self.data.get_real();
-            let animated = self.data.get_animated();
-
-            // Don't use margin of error
-            if self.mesh.is_none() || real.radii != animated.radii || real.size != animated.size {
-                self.mesh = Some(MeshXyz::new_rect(ctx.display, animated.size, animated.radii));
-            }
-        }
-
-        // Translate
-        let mut transformation = glm::translation(&glm::vec2_to_vec3(&if let Some(preview) = &as_preview {
-            preview.position
+        if is_viewport {
+            // Don't draw viewport
         } else {
-            position.reveal()
-        }));
+            // Refresh mesh
+            {
+                let real = self.data.get_real();
+                let animated = self.data.get_animated();
 
-        // Rotate
-        transformation = glm::rotate(&transformation, rotation.scalar(), &glm::vec3(0.0, 0.0, -1.0));
+                // Don't use margin of error
+                if self.mesh.is_none() || real.radii != animated.radii || real.size != animated.size {
+                    self.mesh = Some(MeshXyz::new_rect(ctx.display, animated.size, animated.radii));
+                }
+            }
 
-        // Scale
-        if let Some(preview) = &as_preview {
-            let max_size = glm::comp_max(&size.abs());
-            let preview_scale = preview.radius.div_or_zero(max_size);
-            transformation = glm::scale(&transformation, &glm::vec3(preview_scale, preview_scale, 0.0));
-        }
-
-        let uniforms = glium::uniform! {
-            transformation: transformation.as_values(),
-            view: if as_preview.is_some() {
-                glm::identity::<f32, 4>().as_values()
+            // Translate
+            let mut transformation = glm::translation(&glm::vec2_to_vec3(&if let Some(preview) = &as_preview {
+                preview.position
             } else {
-                ctx.view.as_values()
-            },
-            projection: ctx.projection.as_values(),
-            color: color.as_values()
-        };
+                position.reveal()
+            }));
 
-        let mesh = self.mesh.as_ref().unwrap();
-        ctx.draw(&mesh.vertex_buffer, &mesh.indices, ctx.color_shader, &uniforms, &Default::default())
-            .unwrap();
+            // Rotate
+            transformation = glm::rotate(&transformation, rotation.scalar(), &glm::vec3(0.0, 0.0, -1.0));
+
+            // Scale
+            if let Some(preview) = &as_preview {
+                let max_size = glm::comp_max(&size.abs());
+                let preview_scale = preview.radius.div_or_zero(max_size);
+                transformation = glm::scale(&transformation, &glm::vec3(preview_scale, preview_scale, 0.0));
+            }
+
+            let uniforms = glium::uniform! {
+                transformation: transformation.as_values(),
+                view: if as_preview.is_some() {
+                    glm::identity::<f32, 4>().as_values()
+                } else {
+                    ctx.view.as_values()
+                },
+                projection: ctx.projection.as_values(),
+                color: color.as_values()
+            };
+
+            let mesh = self.mesh.as_ref().unwrap();
+            ctx.draw(&mesh.vertex_buffer, &mesh.indices, ctx.color_shader, &uniforms, &Default::default())
+                .unwrap();
+        }
     }
 }
 

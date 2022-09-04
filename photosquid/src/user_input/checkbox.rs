@@ -59,16 +59,26 @@ impl Checkbox {
         self.has_new_content = true;
     }
 
+    pub fn checked(&self) -> bool {
+        self.checked
+    }
+
     fn update_checkmark(&mut self, ctx: &mut RenderCtx) {
         if self.color.is_none() {
             self.color = Some(Smooth::new(ctx.color_scheme.light_ribbon, Some(Duration::from_millis(200))));
         }
 
-        let checkmark = self
-            .checkmark
-            .get_or_insert_with(|| IconButton::new(include_str!("../_src_objs/check.obj"), PressAnimation::HalfCycle, (), ctx.display));
+        let checkmark = self.checkmark.get_or_insert_with(|| {
+            IconButton::new(
+                include_str!("../_src_objs/check.obj"),
+                PressAnimation::Deform,
+                (),
+                ctx.display,
+                Some(Duration::from_millis(500)),
+            )
+        });
 
-        let checked_color = Color::from_hex("#999999");
+        let checked_color = ctx.color_scheme.foreground;
         let unchecked_color = ctx.color_scheme.light_ribbon;
 
         let color = self.color.as_mut().unwrap();

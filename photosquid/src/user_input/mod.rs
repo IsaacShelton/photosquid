@@ -23,7 +23,6 @@ use std::rc::Rc;
 pub enum UserInput {
     TextInput(TextInput),
 
-    #[allow(dead_code)]
     Checkbox(Checkbox),
 
     Button(Button),

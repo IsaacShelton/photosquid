@@ -19,6 +19,7 @@ mod capture;
 mod clearable;
 mod color;
 mod color_scheme;
+mod components;
 mod context_menu;
 mod ctrl_or_cmd;
 mod data;

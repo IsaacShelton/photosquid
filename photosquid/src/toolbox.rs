@@ -59,6 +59,7 @@ impl ToolBox {
             PressAnimation::Scale,
             tools.insert(Tool::main_menu()),
             display,
+            None,
         ));
 
         self.add_tool_button(ToolButton::new(
@@ -66,6 +67,7 @@ impl ToolBox {
             PressAnimation::Deform,
             tools.insert(Tool::pointer()),
             display,
+            None,
         ));
 
         self.add_tool_button(ToolButton::new(
@@ -73,6 +75,7 @@ impl ToolBox {
             PressAnimation::Deform,
             tools.insert(Tool::pan()),
             display,
+            None,
         ));
 
         self.add_tool_button(ToolButton::new(
@@ -80,6 +83,7 @@ impl ToolBox {
             PressAnimation::Deform,
             tools.insert(Tool::rect()),
             display,
+            None,
         ));
 
         self.add_tool_button(ToolButton::new(
@@ -87,6 +91,7 @@ impl ToolBox {
             PressAnimation::Deform,
             tools.insert(Tool::tri()),
             display,
+            None,
         ));
 
         self.add_tool_button(ToolButton::new(
@@ -94,6 +99,7 @@ impl ToolBox {
             PressAnimation::Deform,
             tools.insert(Tool::circle()),
             display,
+            None,
         ));
 
         // Select first non-menu tool
@@ -106,6 +112,7 @@ impl ToolBox {
             PressAnimation::Deform,
             tabs.insert(Box::new(options::tab::Object::new())),
             display,
+            None,
         ));
 
         self.add_options_tab_button(options::TabButton::new(
@@ -113,6 +120,7 @@ impl ToolBox {
             PressAnimation::Deform,
             tabs.insert(Box::new(options::tab::Layers::new())),
             display,
+            None,
         ));
 
         self.select_tab(0);

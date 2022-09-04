@@ -14,6 +14,7 @@ pub struct RectData {
     pub color: NoLerp<Color>,
     pub rotation: Rad<f32>,
     pub radii: BorderRadii,
+    pub is_viewport: bool,
 }
 
 #[derive(Copy, Clone, PartialEq, PartialOrd, Debug, Default, Serialize, Deserialize)]
@@ -67,6 +68,7 @@ impl Lerpable for RectData {
             rotation: self.rotation.lerp(&other.rotation, scalar),
             color: self.color.lerp(&other.color, scalar),
             radii: self.radii.lerp(&other.radii, scalar),
+            is_viewport: self.is_viewport,
         }
     }
 }

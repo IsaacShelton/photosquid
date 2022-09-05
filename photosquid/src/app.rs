@@ -4,8 +4,10 @@ use crate::{
     color_scheme::ColorScheme,
     context_menu::ContextMenu,
     ctrl_or_cmd::CtrlOrCmd,
-    dialog::{ask_open, ask_save},
+    data::RectData,
+    dialog::{ask_open, ask_save, Filter},
     dragging::Dragging,
+    export::export,
     history::History,
     interaction::{Interaction, KeyInteraction},
     interaction_options::InteractionOptions,
@@ -30,6 +32,7 @@ use glium::{
 };
 use glium_text_rusttype::{FontTexture, TextSystem};
 use nalgebra_glm as glm;
+use native_dialog::{MessageDialog, MessageType};
 use slotmap::SlotMap;
 use std::{
     collections::{btree_set::BTreeSet, HashSet},
@@ -434,8 +437,8 @@ impl App {
                 .filename
                 .as_ref()
                 .map(|existing_filename| existing_filename.clone())
-                .or_else(|| ask_save().unwrap_or(None)),
-            SaveMethod::SaveAs => ask_save().unwrap_or(None),
+                .or_else(|| ask_save(None).unwrap_or(None)),
+            SaveMethod::SaveAs => ask_save(None).unwrap_or(None),
         } {
             self.save_to_file(filename);
         }
@@ -444,6 +447,28 @@ impl App {
     pub fn load(&mut self) {
         if let Ok(Some(filename)) = ask_open() {
             self.load_from_file(filename);
+        }
+    }
+
+    pub fn export(&mut self) {
+        let viewport = if let Some(viewport) = self.get_selected_viewport() {
+            viewport
+        } else {
+            _ = MessageDialog::new()
+                .set_title("No viewport selected!")
+                .set_text("Must have a viewport selected to export")
+                .set_type(MessageType::Error)
+                .show_alert();
+            return;
+        };
+
+        if let Some(filename) = ask_save(Some(Filter {
+            description: "Scalable Vector Graphic",
+            extension: "svg",
+        }))
+        .unwrap_or(None)
+        {
+            self.export_to_file(filename, viewport);
         }
     }
 
@@ -463,6 +488,11 @@ impl App {
         self.update_title();
     }
 
+    pub fn export_to_file(&mut self, filename: PathBuf, viewport: RectData) {
+        println!("exporting to {}", filename.to_string_lossy());
+        _ = export(filename, &viewport, &self.ocean);
+    }
+
     pub fn reset_camera(&mut self) {
         self.camera.set(Camera::identity(self.dimensions))
     }
@@ -476,6 +506,26 @@ impl App {
         };
 
         self.display.gl_window().window().set_title(&new_title);
+    }
+
+    pub fn get_selected_viewport(&self) -> Option<RectData> {
+        for selection in self.selections.iter() {
+            if let Some(squid) = self.ocean.get(selection.squid_id) {
+                if let Some(viewport) = squid.as_viewport() {
+                    return Some(viewport);
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn about(&self) {
+        _ = MessageDialog::new()
+            .set_title("Photosquid")
+            .set_text("(c) 2021-2022 - Isaac Shelton")
+            .set_type(MessageType::Info)
+            .show_alert();
     }
 }
 

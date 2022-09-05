@@ -311,6 +311,8 @@ impl Tri {
         is_point_inside_triangle(underneath, p1, p2, p3)
     }
 
+    pub fn build(&self, _builder: &impl lyon::path::builder::PathBuilder) {}
+
     fn reposition_point(&mut self, mouse_position: &glm::Vec2, camera: &Camera) {
         let TriData {
             p1,

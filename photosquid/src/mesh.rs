@@ -7,6 +7,7 @@ use crate::{
     vertex::{Vertex, VertexXYUV},
 };
 use glium::{index::PrimitiveType, Display, VertexBuffer};
+use lyon::geom::Box2D;
 use nalgebra_glm as glm;
 
 pub enum MeshIndices {
@@ -94,11 +95,7 @@ impl MeshXyz {
 
     pub fn new_rect(display: &Display, size: glm::Vec2, radii: BorderRadii) -> Self {
         use lyon::{
-            path::{
-                builder::PathBuilder,
-                math::{point, Rect, Size},
-                Winding,
-            },
+            path::{math::point, Winding},
             tessellation::{BuffersBuilder, FillOptions, FillTessellator, FillVertex, VertexBuffers},
         };
 
@@ -107,7 +104,7 @@ impl MeshXyz {
 
         let mut builder = lyon::path::Path::builder();
         builder.add_rounded_rectangle(
-            &Rect::new(point(-width / 2.0, -height / 2.0), Size::new(width, height)),
+            &Box2D::new(point(-width / 2.0, -height / 2.0), point(width / 2.0, height / 2.0)),
             &radii.into(),
             Winding::Positive,
         );

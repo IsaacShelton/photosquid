@@ -26,6 +26,7 @@ mod data;
 mod dialog;
 mod dragging;
 mod draw_text;
+mod export;
 mod history;
 mod icon_button;
 mod interaction;

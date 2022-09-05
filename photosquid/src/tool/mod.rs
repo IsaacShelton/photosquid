@@ -48,20 +48,8 @@ impl Tool {
                 UserInput::Button(Button::new("Open".to_string(), Box::new(|app| app.load()))),
                 UserInput::Button(Button::new("Save".to_string(), Box::new(|app| app.save(Save)))),
                 UserInput::Button(Button::new("Save As".to_string(), Box::new(|app| app.save(SaveAs)))),
-                UserInput::Button(Button::new(
-                    "Export".to_string(),
-                    Box::new(|_| {
-                        // @todo
-                        println!("Export!");
-                    }),
-                )),
-                UserInput::Button(Button::new(
-                    "About".to_string(),
-                    Box::new(|_| {
-                        // @todo
-                        println!("About!");
-                    }),
-                )),
+                UserInput::Button(Button::new("Export".to_string(), Box::new(|app| app.export()))),
+                UserInput::Button(Button::new("About".to_string(), Box::new(|app| app.about()))),
             ],
         }
     }

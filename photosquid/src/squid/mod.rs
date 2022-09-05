@@ -450,6 +450,22 @@ impl Squid {
         }
     }
 
+    pub fn as_viewport(&self) -> Option<RectData> {
+        match &self.data {
+            SquidData::Rect(rect) if rect.data.get_real().is_viewport => {
+                return Some(*rect.data.get_real());
+            }
+            _ => None,
+        }
+    }
+    pub fn build(&self, builder: &mut impl lyon::path::builder::PathBuilder) {
+        match &self.data {
+            SquidData::Rect(rect) => rect.build(builder),
+            SquidData::Circle(circle) => circle.build(builder),
+            SquidData::Tri(tri) => tri.build(builder),
+        }
+    }
+
     // Attempt to get a context menu for if a quid is underneath a point
     pub fn try_context_menu(&self, underneath: glm::Vec2, camera: &Camera, _self_reference: SquidRef, color_scheme: &ColorScheme) -> Option<ContextMenu> {
         if self.is_point_over(underneath, camera) {

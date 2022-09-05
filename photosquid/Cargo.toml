@@ -17,13 +17,14 @@ glium_text_rusttype = { path = "../glium_text_rusttype" }
 rand = "0.7"
 enum-as-inner = "0.3"
 angular-units = { version = "0.2", features = ["serde"] }
-lyon="0.17"
 more-asserts="0.2"
 lazy_static = "1.4"
 derive_deref = "1.1.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 native-dialog = { version = "0.6.3", features = ["windows_dpi_awareness", "windows_visual_styles"] }
+svg = "0.10.0"
+lyon = "1.0.0"
 
 # bincode = "1.2.1"
 # approx = "0.5.0"

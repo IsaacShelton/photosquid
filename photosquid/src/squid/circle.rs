@@ -174,6 +174,8 @@ impl Circle {
         glm::distance(&real.position.reveal(), &point) < real.radius
     }
 
+    pub fn build(&self, _builder: &impl lyon::path::builder::PathBuilder) {}
+
     fn reposition_radius(&mut self, mouse: &glm::Vec2, camera: &Camera) {
         let real_in_world = self.data.get_real();
         let target_in_world = camera.apply_reverse(mouse);

@@ -18,6 +18,10 @@ use crate::{
 };
 use angular_units::{Angle, Rad};
 use glium::glutin::event::MouseButton;
+use lyon::{
+    geom::Box2D,
+    path::{math::point, Winding},
+};
 use nalgebra_glm as glm;
 use serde::{Deserialize, Serialize};
 
@@ -182,6 +186,10 @@ impl Rect {
     }
 
     pub fn is_point_over(&self, mouse_position: glm::Vec2, camera: &Camera) -> bool {
+        if self.data.get_animated().is_viewport {
+            return false;
+        }
+
         let underneath = camera.apply_reverse(&mouse_position);
 
         let corners: Vec<glm::Vec2> = self.get_world_corners();
@@ -350,6 +358,18 @@ impl Rect {
             ctx.draw(&mesh.vertex_buffer, &mesh.indices, ctx.color_shader, &uniforms, &Default::default())
                 .unwrap();
         }
+    }
+
+    pub fn build(&self, builder: &mut impl lyon::path::builder::PathBuilder) {
+        let RectData { position, size, radii, .. } = self.data.get_real();
+        let position = position.reveal();
+
+        let x = position.x;
+        let y = position.y;
+        let hw = size.x * 0.5;
+        let hh = size.y * 0.5;
+
+        builder.add_rounded_rectangle(&Box2D::new(point(x - hw, y - hh), point(x + hw, y + hh)), &radii.into(), Winding::Positive, &[]);
     }
 }
 

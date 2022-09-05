@@ -3,8 +3,8 @@ use crate::{
     as_values::AsValues,
     capture::{Capture, KeyCapture},
     color::Color,
+    draw_text::draw_text_centered,
     render_ctx::RenderCtx,
-    text_helpers,
 };
 use glium::glutin::event::{MouseButton, VirtualKeyCode};
 use glium_text_rusttype::{FontTexture, TextDisplay, TextSystem};
@@ -195,7 +195,7 @@ impl TextInput {
             Color::from_hex("#777777")
         };
 
-        text_helpers::draw_text_centered(
+        draw_text_centered(
             &mut self.text_display,
             text_system,
             font,
@@ -210,7 +210,7 @@ impl TextInput {
         let input_area_center = glm::vec2(input_area.min_x + input_area.width() / 2.0, input_area.min_y + input_area.height() / 2.0);
         let relative_position = glm::vec2(0.0, -28.0);
 
-        text_helpers::draw_text_centered(
+        draw_text_centered(
             &mut self.label_display,
             text_system,
             font,

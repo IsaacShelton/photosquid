@@ -1,4 +1,4 @@
-use crate::{aabb::AABB, as_values::AsValues, color::Color, render_ctx::RenderCtx, text_helpers};
+use crate::{aabb::AABB, as_values::AsValues, color::Color, draw_text, render_ctx::RenderCtx};
 use glium::glutin::event::MouseButton;
 use glium_text_rusttype::{FontTexture, TextDisplay, TextSystem};
 use nalgebra_glm as glm;
@@ -127,10 +127,10 @@ impl ContextMenuOption {
     }
 
     pub fn get_text_display(&mut self, text_system: &TextSystem, font: Rc<FontTexture>) -> &TextDisplay<Rc<FontTexture>> {
-        text_helpers::get_or_make_display(&mut self.text_display, text_system, font, &self.friendly_name)
+        draw_text::get_or_make_display(&mut self.text_display, text_system, font, &self.friendly_name)
     }
 
     pub fn get_shortcut_display(&mut self, text_system: &TextSystem, font: Rc<FontTexture>) -> &TextDisplay<Rc<FontTexture>> {
-        text_helpers::get_or_make_display(&mut self.shortcut_display, text_system, font, &self.friendly_shortcut)
+        draw_text::get_or_make_display(&mut self.shortcut_display, text_system, font, &self.friendly_shortcut)
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
-    aabb::AABB, as_values::AsValues, capture::Capture, color::Color, icon_button::IconButton, press_animation::PressAnimation, render_ctx::RenderCtx,
-    smooth::Smooth, text_helpers,
+    aabb::AABB, as_values::AsValues, capture::Capture, color::Color, draw_text::draw_text_centered, icon_button::IconButton, press_animation::PressAnimation,
+    render_ctx::RenderCtx, smooth::Smooth,
 };
 use glium::glutin::event::MouseButton;
 use glium_text_rusttype::{FontTexture, TextDisplay, TextSystem};
@@ -97,7 +97,7 @@ impl Checkbox {
         let input_area_center = glm::vec2(input_area.min_x + input_area.width() / 2.0, input_area.min_y + input_area.height() / 2.0);
         let relative_position = glm::vec2(0.0, -28.0);
 
-        text_helpers::draw_text_centered(
+        draw_text_centered(
             &mut self.label_display,
             text_system,
             font,

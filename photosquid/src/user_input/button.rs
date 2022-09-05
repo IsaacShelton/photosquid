@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{app::App, as_values::AsValues, color::Color, text_helpers};
+use crate::{app::App, as_values::AsValues, color::Color, draw_text::draw_text_centered};
 use glium::glutin::event::MouseButton;
 use glium_text_rusttype::{FontTexture, TextDisplay, TextSystem};
 use nalgebra_glm as glm;
@@ -72,7 +72,7 @@ impl Button {
 
         let color = Color::from_hex("#FFFFFF");
 
-        text_helpers::draw_text_centered(
+        draw_text_centered(
             &mut self.text_display,
             text_system,
             font,

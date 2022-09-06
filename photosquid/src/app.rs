@@ -116,7 +116,7 @@ impl App {
         let mouse_position = self.mouse_position.unwrap();
         let mouse_position = glm::vec2(mouse_position.x, mouse_position.y);
         let ratios = mouse_position.component_div(&self.camera.get_real().window);
-        let view = self.camera.get_real().to_view();
+        let view = self.camera.get_real().view();
         let view_size = view.1 - view.0;
         let center = view.0 + ratios.component_mul(&view_size);
 
@@ -433,11 +433,7 @@ impl App {
 
     pub fn save(&mut self, method: SaveMethod) {
         if let Some(filename) = match method {
-            SaveMethod::Save => self
-                .filename
-                .as_ref()
-                .map(|existing_filename| existing_filename.clone())
-                .or_else(|| ask_save(None).unwrap_or(None)),
+            SaveMethod::Save => self.filename.as_ref().cloned().or_else(|| ask_save(None).unwrap_or(None)),
             SaveMethod::SaveAs => ask_save(None).unwrap_or(None),
         } {
             self.save_to_file(filename);
@@ -494,11 +490,11 @@ impl App {
     }
 
     pub fn reset_camera(&mut self) {
-        self.camera.set(Camera::identity(self.dimensions))
+        self.camera.set(Camera::identity(self.dimensions));
     }
 
     pub fn update_title(&mut self) {
-        let new_title = match self.filename.as_ref().map(|filepath| filepath.file_name()).flatten() {
+        let new_title = match self.filename.as_ref().and_then(|filepath| filepath.file_name()) {
             Some(filename) => {
                 format!("Photosquid :) - {}", filename.to_str().unwrap())
             }
@@ -509,7 +505,7 @@ impl App {
     }
 
     pub fn get_selected_viewport(&self) -> Option<RectData> {
-        for selection in self.selections.iter() {
+        for selection in &self.selections {
             if let Some(squid) = self.ocean.get(selection.squid_id) {
                 if let Some(viewport) = squid.as_viewport() {
                     return Some(viewport);
@@ -529,7 +525,7 @@ impl App {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub enum SaveMethod {
     Save,
     SaveAs,

@@ -18,7 +18,7 @@ pub struct Smooth<T: Lerpable + Copy> {
 }
 
 pub fn default_smooth_duration() -> Duration {
-    return Duration::from_millis(500);
+    Duration::from_millis(500)
 }
 
 impl<T: Lerpable + Copy> Smooth<T>
@@ -30,7 +30,7 @@ where
             data: initial,
             previous: initial,
             changed: Instant::now(),
-            duration: duration.unwrap_or_else(|| default_smooth_duration()),
+            duration: duration.unwrap_or_else(default_smooth_duration),
         }
     }
 

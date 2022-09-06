@@ -55,7 +55,7 @@ impl Layers {
 
             y += Self::SMALL_STRIP_HEIGHT;
 
-            for squid_ref in layer.squids.iter() {
+            for squid_ref in &layer.squids {
                 entries.push(Entry::Child(Child { squid: *squid_ref, y }));
                 y += Self::SMALL_STRIP_HEIGHT;
             }
@@ -69,11 +69,11 @@ impl Layers {
             return None;
         }
 
-        for entry in self.entries.iter() {
+        for entry in &self.entries {
             match entry {
                 Entry::Child(Child { y, .. }) | Entry::LayerName(LayerName { y, .. }) => {
                     if mouse.y >= *y - 0.5 * Self::SMALL_STRIP_HEIGHT && mouse.y < y - 0.5 * Self::SMALL_STRIP_HEIGHT + Self::SMALL_STRIP_HEIGHT {
-                        return Some(&entry);
+                        return Some(entry);
                     }
                 }
             }
@@ -86,30 +86,28 @@ impl Layers {
 impl Tab for Layers {
     fn interact(&mut self, interaction: Interaction, app: &mut App) -> Capture {
         match interaction {
-            Interaction::Click(click_interaction) => {
-                if let ClickInteraction {
-                    button: MouseButton::Left,
-                    modifiers,
-                    position,
-                } = click_interaction
-                {
-                    if position.x >= app.dimensions.x - Layers::TAB_WIDTH {
-                        let clicked: Option<&Entry> = self.get_clicked_entry(&position, &app.dimensions);
+            Interaction::Click(ClickInteraction {
+                button: MouseButton::Left,
+                modifiers,
+                position,
+                ..
+            }) => {
+                if position.x >= app.dimensions.x - Layers::TAB_WIDTH {
+                    let clicked: Option<&Entry> = self.get_clicked_entry(&position, &app.dimensions);
 
-                        match clicked {
-                            Some(Entry::Child(Child { squid, .. })) => {
-                                if !modifiers.shift() {
-                                    app.selections.clear()
-                                }
-
-                                app.selections.push(Selection {
-                                    squid_id: *squid,
-                                    limb_id: None,
-                                });
+                    match clicked {
+                        Some(Entry::Child(Child { squid, .. })) => {
+                            if !modifiers.shift() {
+                                app.selections.clear();
                             }
-                            Some(Entry::LayerName(_)) => (),
-                            None => (),
+
+                            app.selections.push(Selection {
+                                squid_id: *squid,
+                                limb_id: None,
+                            });
                         }
+                        Some(Entry::LayerName(_)) => (),
+                        None => (),
                     }
                 }
             }
@@ -126,7 +124,7 @@ impl Tab for Layers {
 
         let left = ctx.width - Self::TAB_WIDTH + LEFT_MARGIN;
 
-        for entry in self.entries.iter() {
+        for entry in &self.entries {
             match entry {
                 Entry::LayerName(layer_name) => {
                     // Draw layer name

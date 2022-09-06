@@ -12,14 +12,14 @@ use nalgebra_glm as glm;
 
 pub enum MeshIndices {
     None(glium::index::NoIndices),
-    TrianglesU16(glium::IndexBuffer<u16>),
+    TrianglesU16(Box<glium::IndexBuffer<u16>>),
 }
 
-impl<'a> Into<glium::index::IndicesSource<'a>> for &'a MeshIndices {
-    fn into(self) -> glium::index::IndicesSource<'a> {
-        match self {
+impl<'a> From<&'a MeshIndices> for glium::index::IndicesSource<'a> {
+    fn from(indices: &'a MeshIndices) -> Self {
+        match indices {
             MeshIndices::None(indices) => indices.into(),
-            MeshIndices::TrianglesU16(indices) => indices.into(),
+            MeshIndices::TrianglesU16(indices) => indices.as_ref().into(),
         }
     }
 }
@@ -51,7 +51,7 @@ impl MeshXyz {
 
         Self {
             vertex_buffer,
-            indices: MeshIndices::TrianglesU16(indices),
+            indices: MeshIndices::TrianglesU16(Box::new(indices)),
         }
     }
 

@@ -14,7 +14,7 @@ pub struct Filter<'a> {
 }
 
 pub fn ask_save(filter: Option<Filter>) -> Result<Option<PathBuf>, String> {
-    let filter = filter.unwrap_or_else(|| Filter {
+    let filter = filter.unwrap_or(Filter {
         description: "Photosquid Project",
         extension: "photosquid",
     });

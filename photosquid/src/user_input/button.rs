@@ -18,7 +18,7 @@ impl Button {
         Self {
             text,
             text_display: None,
-            action: action,
+            action,
         }
     }
 
@@ -33,7 +33,7 @@ impl Button {
 
     pub fn render(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>, area: &AABB) {
         self.render_box(ctx, area);
-        self.render_text(ctx, text_system, font.clone(), area);
+        self.render_text(ctx, text_system, font, area);
     }
 
     fn render_box(&self, ctx: &mut RenderCtx, area: &AABB) {

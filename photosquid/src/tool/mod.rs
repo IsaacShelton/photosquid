@@ -25,7 +25,7 @@ use VirtualKeyCode::Escape;
 
 new_key_type! { pub struct ToolKey; }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum ToolKind {
     MainMenu,
     Circle,
@@ -117,22 +117,19 @@ impl Tool {
         let capture = self.interact_options_impl(interaction, app);
 
         // Post interaction
-        match self.kind {
-            ToolKind::Pan => {
-                let existing_position = app.camera.get_real().position;
+        if self.kind == ToolKind::Pan {
+            let existing_position = app.camera.get_real().position;
 
-                // Update options
-                if let Some(new_content) = self.user_inputs[0].as_text_input_mut().unwrap().poll() {
-                    let new_x = new_content.parse::<f32>().unwrap_or_default();
-                    app.camera.set_location(glm::vec2(new_x, existing_position.y));
-                }
-
-                if let Some(new_content) = self.user_inputs[1].as_text_input_mut().unwrap().poll() {
-                    let new_y = new_content.parse::<f32>().unwrap_or_default();
-                    app.camera.set_location(glm::vec2(existing_position.x, new_y));
-                }
+            // Update options
+            if let Some(new_content) = self.user_inputs[0].as_text_input_mut().unwrap().poll() {
+                let new_x = new_content.parse::<f32>().unwrap_or_default();
+                app.camera.set_location(glm::vec2(new_x, existing_position.y));
             }
-            _ => (),
+
+            if let Some(new_content) = self.user_inputs[1].as_text_input_mut().unwrap().poll() {
+                let new_y = new_content.parse::<f32>().unwrap_or_default();
+                app.camera.set_location(glm::vec2(existing_position.x, new_y));
+            }
         }
 
         capture
@@ -182,19 +179,16 @@ impl Tool {
 
     pub fn render_options(&mut self, ctx: &mut RenderCtx, text_system: &TextSystem, font: Rc<FontTexture>) {
         // Pre-render
-        match self.kind {
-            ToolKind::Pan => {
-                let x_input = self.user_inputs[0].as_text_input_mut().unwrap();
-                if !x_input.is_focused() {
-                    x_input.set(&ctx.real_camera.position.x.round().to_string());
-                }
-
-                let y_input = self.user_inputs[1].as_text_input_mut().unwrap();
-                if !y_input.is_focused() {
-                    y_input.set(&ctx.real_camera.position.y.round().to_string());
-                }
+        if self.kind == ToolKind::Pan {
+            let x_input = self.user_inputs[0].as_text_input_mut().unwrap();
+            if !x_input.is_focused() {
+                x_input.set(&ctx.real_camera.position.x.round().to_string());
             }
-            _ => (),
+
+            let y_input = self.user_inputs[1].as_text_input_mut().unwrap();
+            if !y_input.is_focused() {
+                y_input.set(&ctx.real_camera.position.y.round().to_string());
+            }
         }
 
         // Render

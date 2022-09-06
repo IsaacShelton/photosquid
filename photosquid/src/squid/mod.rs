@@ -283,8 +283,7 @@ impl Squid {
     pub fn rotate(&mut self, mouse_delta_theta: Rad<f32>, options: &InteractionOptions) {
         let delta_theta = self
             .rotate_behavior()
-            .map(|behavior| behavior.accumulate(&mouse_delta_theta, options.rotation_snapping))
-            .flatten();
+            .and_then(|behavior| behavior.accumulate(&mouse_delta_theta, options.rotation_snapping));
 
         if let Some(delta_theta) = delta_theta {
             self.rotate_by(delta_theta);

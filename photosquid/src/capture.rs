@@ -17,7 +17,7 @@ pub enum Capture {
     DilateSelectedSquids { current: glm::Vec2 },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum KeyCapture {
     Capture,
     Miss,

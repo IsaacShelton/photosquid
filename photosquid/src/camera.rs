@@ -24,10 +24,11 @@ impl Camera {
     }
 
     pub fn mat(&self) -> glm::Mat4 {
-        let matrix = glm::translation(&glm::vec2_to_vec3(&(-self.position * self.zoom)));
-        let matrix = glm::translate(&matrix, &glm::vec2_to_vec3(&(0.5 * self.window)));
-        let matrix = glm::scale(&matrix, &glm::vec3(self.zoom, self.zoom, 1.0));
-        let matrix = glm::translate(&matrix, &glm::vec2_to_vec3(&(-0.5 * self.window)));
+        let mut matrix;
+        matrix = glm::translation(&glm::vec2_to_vec3(&(-self.position * self.zoom)));
+        matrix = glm::translate(&matrix, &glm::vec2_to_vec3(&(0.5 * self.window)));
+        matrix = glm::scale(&matrix, &glm::vec3(self.zoom, self.zoom, 1.0));
+        matrix = glm::translate(&matrix, &glm::vec2_to_vec3(&(-0.5 * self.window)));
         matrix
     }
 
@@ -82,7 +83,7 @@ impl Camera {
         }
     }
 
-    pub fn to_view(&self) -> (glm::Vec2, glm::Vec2) {
+    pub fn view(&self) -> (glm::Vec2, glm::Vec2) {
         let view_size = self.window / self.zoom;
         (self.position - 0.5 * view_size, self.position + 0.5 * view_size)
     }
@@ -140,7 +141,7 @@ mod tests {
             window,
         };
 
-        assert_eq!(view, camera.to_view());
+        assert_eq!(view, camera.view());
     }
 
     #[test]
@@ -157,14 +158,14 @@ mod tests {
             window,
         });
 
-        let view = camera.get_real().to_view();
+        let view = camera.get_real().view();
         assert_eq!(view.0, glm::vec2(0.0, 0.0));
         assert_eq!(view.1, glm::vec2(1000.0, 2000.0));
 
         let focus = glm::zero();
         camera.zoom_point(2.0, &focus);
 
-        let view = camera.get_real().to_view();
+        let view = camera.get_real().view();
         assert_eq!(view, (glm::vec2(0.0, 0.0), glm::vec2(500.0, 1000.0)));
 
         let components = Camera::view_to_components(&window, view);
@@ -186,14 +187,14 @@ mod tests {
             window,
         });
 
-        let view = camera.get_real().to_view();
+        let view = camera.get_real().view();
         assert_eq!(view.0, glm::vec2(0.0, 0.0));
         assert_eq!(view.1, glm::vec2(1000.0, 2000.0));
 
         let focus = components.0;
         camera.zoom_point(2.0, &focus);
 
-        let view = camera.get_real().to_view();
+        let view = camera.get_real().view();
         assert_eq!(view, (glm::vec2(250.0, 500.0), glm::vec2(750.0, 1500.0)));
 
         let components = Camera::view_to_components(&window, view);
@@ -215,14 +216,14 @@ mod tests {
             window,
         });
 
-        let view = camera.get_real().to_view();
+        let view = camera.get_real().view();
         assert_eq!(view.0, glm::vec2(200.0, 400.0));
         assert_eq!(view.1, glm::vec2(400.0, 800.0));
 
         let focus = glm::vec2(200.0, 400.0);
         camera.zoom_point(2.0, &focus);
 
-        let view = camera.get_real().to_view();
+        let view = camera.get_real().view();
         assert_eq!(view, (glm::vec2(200.0, 400.0), glm::vec2(300.0, 600.0)));
 
         let components = Camera::view_to_components(&window, view);
@@ -267,7 +268,7 @@ impl EasySmoothCamera for Smooth<Camera> {
 
     fn zoom_point(&mut self, zoom_multiplier: f32, point_in_world_space: &glm::Vec2) {
         let window = self.get_real().window;
-        let original_view = self.get_real().to_view();
+        let original_view = self.get_real().view();
 
         let original_view_size = original_view.1 - original_view.0;
         let ratios = (point_in_world_space - original_view.0).component_div(&original_view_size);

@@ -13,7 +13,7 @@ use angular_units::Rad;
 use glium::glutin::event::{MouseButton, VirtualKeyCode};
 use nalgebra_glm as glm;
 
-pub fn interact(user_inputs: &mut Vec<UserInput>, interaction: Interaction, app: &mut App) -> Capture {
+pub fn interact(user_inputs: &mut [UserInput], interaction: Interaction, app: &mut App) -> Capture {
     poll_to_set_program_wide_options(user_inputs, app);
 
     match interaction {
@@ -148,7 +148,7 @@ fn pointer_handle_hotkey(app: &mut App, virtual_keycode: VirtualKeyCode) -> Capt
     }
 }
 
-fn poll_to_set_program_wide_options(user_inputs: &mut Vec<UserInput>, app: &mut App) {
+fn poll_to_set_program_wide_options(user_inputs: &mut [UserInput], app: &mut App) {
     if let Some(new_content) = user_inputs[0].as_text_input_mut().unwrap().poll() {
         app.interaction_options.translation_snapping = new_content.parse::<f32>().unwrap_or_default().max(1.0);
     }

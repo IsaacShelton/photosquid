@@ -373,7 +373,7 @@ impl Rect {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 enum RectScaleFrom {
     Corner,
     Center,

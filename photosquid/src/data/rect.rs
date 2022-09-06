@@ -50,12 +50,7 @@ impl From<BorderRadii> for LyonBorderRadii {
 
 impl From<&BorderRadii> for LyonBorderRadii {
     fn from(radii: &BorderRadii) -> Self {
-        LyonBorderRadii {
-            top_left: radii.top_left,
-            top_right: radii.top_right,
-            bottom_left: radii.bottom_left,
-            bottom_right: radii.bottom_right,
-        }
+        LyonBorderRadii::from(*radii)
     }
 }
 

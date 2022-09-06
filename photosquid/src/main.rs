@@ -215,7 +215,7 @@ fn on_modifiers_changed(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>, value
 
     if app.dragging.is_some() {
         let capture = do_drag(app, tools);
-        app.do_capture(capture)
+        app.do_capture(capture);
     }
 }
 

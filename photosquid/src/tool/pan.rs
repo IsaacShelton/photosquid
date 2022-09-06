@@ -6,7 +6,7 @@ use crate::{
     user_input::UserInput,
 };
 
-pub fn interact(_user_inputs: &mut Vec<UserInput>, interaction: Interaction, app: &mut App) -> Capture {
+pub fn interact(_user_inputs: &mut [UserInput], interaction: Interaction, app: &mut App) -> Capture {
     match interaction {
         Interaction::Drag(DragInteraction { delta, .. }) => {
             // Get the "real" camera, which is unaffected by animation

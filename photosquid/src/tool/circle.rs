@@ -7,7 +7,7 @@ use crate::{
 };
 use glium::glutin::event::MouseButton;
 
-pub fn interact(user_inputs: &mut Vec<UserInput>, interaction: Interaction, app: &mut App) -> Capture {
+pub fn interact(user_inputs: &mut [UserInput], interaction: Interaction, app: &mut App) -> Capture {
     match interaction {
         Interaction::Click(ClickInteraction {
             button: MouseButton::Left,

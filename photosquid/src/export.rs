@@ -1,10 +1,5 @@
 use std::path::PathBuf;
-
-use lyon::tessellation::{BuffersBuilder, FillOptions, FillTessellator, FillVertex, StrokeOptions, StrokeTessellator, StrokeVertex, VertexBuffers};
-use svg::{
-    node::element::{path::Data, Path},
-    Document,
-};
+use svg::Document;
 
 use crate::{data::RectData, ocean::Ocean};
 
@@ -15,23 +10,22 @@ struct Vertex {
 }
 
 pub fn export(filename: PathBuf, viewport: &RectData, ocean: &Ocean) -> std::io::Result<()> {
-    let mut builder = lyon::path::Path::builder();
+    let position = viewport.position.reveal();
+    let size = viewport.size;
+
+    let mut document = Document::new().set("viewBox", (position.x - size.x * 0.5, position.y - size.y * 0.5, size.x, size.y));
 
     for squid_ref in ocean.get_squids_lowest() {
         if let Some(squid) = ocean.get(squid_ref) {
-            squid.build(&mut builder);
+            squid.build(&mut document);
         }
     }
-
-    // Create svg representation
-    let path = builder.build();
-    let document = stroke(&path, viewport);
-    let document = document.add(fill(&path, viewport));
 
     // Save svg file
     svg::save(&filename, &document)
 }
 
+/*
 fn stroke(lyon_path: &lyon::path::Path, viewport: &RectData) -> svg::Document {
     // Will contain the result of the tessellation.
     let mut geometry: VertexBuffers<Vertex, u16> = VertexBuffers::new();
@@ -71,7 +65,9 @@ fn fill(lyon_path: &lyon::path::Path, viewport: &RectData) -> svg::Document {
     // Create svg representation for fill geometry
     make_document(geometry, "red", viewport)
 }
+*/
 
+/*
 fn make_document(geometry: VertexBuffers<Vertex, u16>, fill_color: &str, viewport: &RectData) -> svg::Document {
     let RectData { position, size, .. } = viewport;
     let position = position.reveal();
@@ -106,3 +102,4 @@ fn make_document(geometry: VertexBuffers<Vertex, u16>, fill_color: &str, viewpor
 
     document
 }
+*/

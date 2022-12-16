@@ -6,6 +6,7 @@
     clippy::redundant_else
 )]
 #![feature(try_trait_v2)]
+#![feature(array_methods)]
 
 mod aabb;
 mod accumulator;
@@ -64,18 +65,20 @@ use context_menu::ContextAction;
 use dragging::Dragging;
 use glium::{
     glutin::{
-        event::{ElementState, Event::WindowEvent as AbstractWindowEvent, ModifiersState, MouseButton, MouseScrollDelta, WindowEvent as ConcreteWindowEvent},
+        event::{ElementState, Event, ModifiersState, MouseButton, MouseScrollDelta, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
         window::WindowBuilder,
         ContextBuilder, GlProfile, GlRequest,
     },
     Display,
 };
+use glium_text::{FontTexture, TextSystem};
 use glium_text_rusttype as glium_text;
 use interaction::{Interaction, MouseReleaseInteraction};
 use mesh::{MeshXyz, MeshXyzUv};
 use mouse::OnScreen;
 use nalgebra_glm as glm;
+use options::tab::{Tab, TabRef};
 use render_ctx::RenderCtx;
 use selection::selection_contains;
 use shaders::Shaders;
@@ -84,6 +87,8 @@ use smooth::Smooth;
 use squid::SquidRef;
 use std::{
     collections::{btree_set::BTreeSet, HashSet},
+    fs::File,
+    path::Path,
     rc::Rc,
     time::{Duration, Instant},
 };
@@ -113,7 +118,7 @@ fn main() {
     // Build toolbox
     let mut toolbox = ToolBox::new(&display);
     let mut tools: SlotMap<ToolKey, Tool> = SlotMap::with_key();
-    let mut options_tabs: SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>> = SlotMap::with_key();
+    let mut options_tabs: SlotMap<options::tab::TabRef, Box<dyn options::tab::Tab>> = SlotMap::with_key();
 
     // Create standard tool set
     toolbox.create_standard_tools(&mut tools, &display);
@@ -125,25 +130,25 @@ fn main() {
     let square_xyzuv = MeshXyzUv::new_square(&display);
 
     let shaders = Shaders::new(&display);
-    let text_system = glium_text::TextSystem::new(&display);
+    let text_system = TextSystem::new(&display);
 
-    let font = glium_text::FontTexture::new(
+    let font = FontTexture::new(
         &display,
-        std::fs::File::open(&std::path::Path::new("Roboto-Regular.ttf")).unwrap(),
+        File::open(&Path::new("Roboto-Regular.ttf")).unwrap(),
         20,
         glium_text::FontTexture::ascii_character_list(),
     )
     .unwrap();
 
-    fn view_size_from_framebuffer_dimensions(framebuffer_dimensions: (u32, u32), scale_factor: f64) -> glm::Vec2 {
-        let view_width = framebuffer_dimensions.0 as f32 / scale_factor as f32;
-        let view_height = framebuffer_dimensions.1 as f32 / scale_factor as f32;
+    fn view_size_from_framebuffer_dimensions(framebuffer_dimensions: (u32, u32), scale_factor: f32) -> glm::Vec2 {
+        let view_width = framebuffer_dimensions.0 as f32 / scale_factor;
+        let view_height = framebuffer_dimensions.1 as f32 / scale_factor;
         glm::vec2(view_width, view_height)
     }
 
     let scale_factor = display.gl_window().window().scale_factor();
     let framebuffer_dimensions = display.get_framebuffer_dimensions();
-    let initial_dimensions = view_size_from_framebuffer_dimensions(framebuffer_dimensions, scale_factor);
+    let initial_dimensions = view_size_from_framebuffer_dimensions(framebuffer_dimensions, scale_factor as f32);
 
     let mut app = App {
         display,
@@ -182,7 +187,7 @@ fn main() {
         let framebuffer_dimensions = app.display.get_framebuffer_dimensions();
 
         app.frame_start_time = Instant::now();
-        app.dimensions = view_size_from_framebuffer_dimensions(framebuffer_dimensions, scale_factor);
+        app.dimensions = view_size_from_framebuffer_dimensions(framebuffer_dimensions, scale_factor as f32);
         app.camera.manual_get_real().window = app.dimensions;
 
         // Handle user input
@@ -204,8 +209,7 @@ fn main() {
                 false => 0,
             };
 
-            let next_frame_time = app.frame_start_time + Duration::from_millis(wait_millis);
-            *control_flow = ControlFlow::WaitUntil(next_frame_time);
+            *control_flow = ControlFlow::WaitUntil(app.frame_start_time + Duration::from_millis(wait_millis));
         }
     });
 }
@@ -219,24 +223,21 @@ fn on_modifiers_changed(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>, value
     }
 }
 
-fn on_event(
-    abstract_event: glium::glutin::event::Event<()>,
-    app: &mut App,
-    tools: &mut SlotMap<ToolKey, Tool>,
-    options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>,
-) -> Option<ControlFlow> {
-    match abstract_event {
-        AbstractWindowEvent { event, .. } => match event {
-            ConcreteWindowEvent::CloseRequested => return Some(ControlFlow::Exit),
-            ConcreteWindowEvent::KeyboardInput { input, .. } => on_keyboard_input(app, tools, input),
-            ConcreteWindowEvent::ModifiersChanged(value) => on_modifiers_changed(app, tools, value),
-            ConcreteWindowEvent::MouseInput { state, button, .. } => on_mouse_input(app, tools, options_tabs, state, button),
-            ConcreteWindowEvent::CursorMoved { position, .. } => on_mouse_move(app, tools, position),
-            ConcreteWindowEvent::ScaleFactorChanged { scale_factor, .. } => app.scale_factor = scale_factor,
-            ConcreteWindowEvent::MouseWheel { delta, .. } => on_scroll(app, delta),
+fn on_event(event: Event<()>, app: &mut App, tools: &mut SlotMap<ToolKey, Tool>, options_tabs: &mut SlotMap<TabRef, Box<dyn Tab>>) -> Option<ControlFlow> {
+    use WindowEvent::*;
+
+    match event {
+        Event::WindowEvent { event, .. } => match event {
+            CloseRequested => return Some(ControlFlow::Exit),
+            KeyboardInput { input, .. } => on_keyboard_input(app, tools, input),
+            ModifiersChanged(value) => on_modifiers_changed(app, tools, value),
+            MouseInput { state, button, .. } => on_mouse_input(app, tools, options_tabs, state, button),
+            CursorMoved { position, .. } => on_mouse_move(app, tools, position),
+            ScaleFactorChanged { scale_factor, .. } => app.scale_factor = scale_factor,
+            MouseWheel { delta, .. } => on_scroll(app, delta),
             _ => (),
         },
-        glium::glutin::event::Event::RedrawRequested(..) => redraw(app, tools, options_tabs),
+        Event::RedrawRequested(..) => redraw(app, tools, options_tabs),
         _ => (),
     }
     None
@@ -248,7 +249,7 @@ fn update_components(app: &mut App) {
     app.toolbox.update(width, height);
 
     if let Some(new_color) = app.toolbox.color_picker.poll() {
-        for selection in app.selections.iter().filter(|x| x.limb_id.is_none()) {
+        for selection in app.selections.iter().filter(|selection| selection.limb_id.is_none()) {
             if let Some(squid) = app.ocean.get_mut(selection.squid_id) {
                 squid.set_color(new_color);
             }
@@ -256,7 +257,7 @@ fn update_components(app: &mut App) {
     }
 }
 
-fn redraw(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>, options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>) {
+fn redraw(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>, options_tabs: &mut SlotMap<options::tab::TabRef, Box<dyn options::tab::Tab>>) {
     // Get dimensions of window
     let [width, height]: [f32; 2] = app.dimensions.into();
     let (width_u32, height_u32) = app.display.get_framebuffer_dimensions();
@@ -289,7 +290,7 @@ fn redraw(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>, options_tabs: &mut 
 fn render_app<'f>(
     app: &mut App,
     tools: &mut SlotMap<ToolKey, Tool>,
-    options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>,
+    options_tabs: &mut SlotMap<TabRef, Box<dyn Tab>>,
     target: &'f mut glium::Frame,
     framebuffer: &'f mut glium::framebuffer::SimpleFrameBuffer<'f>,
 ) {
@@ -396,6 +397,8 @@ fn render_television(target: &mut glium::Frame, rendered: &glium::texture::SrgbT
 }
 
 fn do_click_context_menu(app: &mut App, button: MouseButton, mouse_position: &glm::Vec2) -> Capture {
+    use ContextAction::*;
+
     if let Some(context_menu) = &app.context_menu {
         // Get context menu action
         let action = context_menu.click(button, mouse_position);
@@ -404,12 +407,12 @@ fn do_click_context_menu(app: &mut App, button: MouseButton, mouse_position: &gl
         app.context_menu = None;
 
         match action {
-            Some(ContextAction::DeleteSelected) => app.delete_selected(),
-            Some(ContextAction::DuplicateSelected) => app.duplicate_selected(),
-            Some(ContextAction::GrabSelected) => app.grab_selected(),
-            Some(ContextAction::RotateSelected) => app.rotate_selected(),
-            Some(ContextAction::ScaleSelected) => app.scale_selected(),
-            Some(ContextAction::Collectively) => app.toggle_next_operation_collectively(),
+            Some(DeleteSelected) => app.delete_selected(),
+            Some(DuplicateSelected) => app.duplicate_selected(),
+            Some(GrabSelected) => app.grab_selected(),
+            Some(RotateSelected) => app.rotate_selected(),
+            Some(ScaleSelected) => app.scale_selected(),
+            Some(Collectively) => app.toggle_next_operation_collectively(),
             None => return Capture::Miss,
         }
 
@@ -419,12 +422,7 @@ fn do_click_context_menu(app: &mut App, button: MouseButton, mouse_position: &gl
     }
 }
 
-fn do_click(
-    app: &mut App,
-    tools: &mut SlotMap<ToolKey, Tool>,
-    options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>,
-    button: MouseButton,
-) -> Capture {
+fn do_click(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>, options_tabs: &mut SlotMap<TabRef, Box<dyn Tab>>, button: MouseButton) -> Capture {
     // Returns whether a drag is allowed to start
 
     app.mouse_buttons_held.insert(button);
@@ -496,13 +494,15 @@ fn do_mouse_release(app: &mut App, button: MouseButton) {
 }
 
 fn do_drag(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>) -> Capture {
+    use MouseButton::*;
+
     let drag = app.dragging.as_ref().unwrap().to_interaction(app.modifiers_held);
     let [width, _]: [f32; 2] = app.dimensions.into();
 
-    app.toolbox.drag(MouseButton::Left, &drag, width)?;
+    app.toolbox.drag(Left, &drag, width)?;
 
     // Redirect middle mouse button to pan tool
-    if app.mouse_buttons_held.contains(&MouseButton::Middle) {
+    if app.mouse_buttons_held.contains(&Middle) {
         if let Some(pan_tool) = find_tool(tools, ToolKind::Pan) {
             pan_tool.interact(drag, app)?;
         }
@@ -516,17 +516,19 @@ fn do_drag(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>) -> Capture {
 }
 
 pub fn on_keyboard_input(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>, input: glium::glutin::event::KeyboardInput) {
+    use ElementState::*;
+
     if let Some(virtual_keycode) = input.virtual_keycode {
         let keys_held = &mut app.keys_held;
 
         match input.state {
-            ElementState::Pressed => {
+            Pressed => {
                 if keys_held.insert(virtual_keycode) {
                     // Press first time
                     app.press_key(virtual_keycode, tools);
                 }
             }
-            ElementState::Released => {
+            Released => {
                 keys_held.remove(&virtual_keycode);
             }
         }
@@ -536,7 +538,7 @@ pub fn on_keyboard_input(app: &mut App, tools: &mut SlotMap<ToolKey, Tool>, inpu
 fn on_mouse_input(
     app: &mut App,
     tools: &mut SlotMap<ToolKey, Tool>,
-    options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>,
+    options_tabs: &mut SlotMap<TabRef, Box<dyn Tab>>,
     state: ElementState,
     button: MouseButton,
 ) {

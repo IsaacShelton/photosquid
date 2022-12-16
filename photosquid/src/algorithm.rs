@@ -21,27 +21,22 @@ pub fn is_point_inside_rectangle(a: glm::Vec2, b: glm::Vec2, c: glm::Vec2, d: gl
     cumulative_area <= area
 }
 
-pub fn is_point_inside_triangle(p: glm::Vec2, p1: glm::Vec2, p2: glm::Vec2, p3: glm::Vec2) -> bool {
-    fn sign(p1: glm::Vec2, p2: glm::Vec2, p3: glm::Vec2) -> f32 {
-        (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
+pub fn is_point_inside_triangle(single_point: glm::Vec2, p: [glm::Vec2; 3]) -> bool {
+    fn sign(a: glm::Vec2, b: glm::Vec2, c: glm::Vec2) -> f32 {
+        (a.x - c.x) * (b.y - c.y) - (b.x - c.x) * (a.y - c.y)
     }
 
-    let d1 = sign(p, p1, p2);
-    let d2 = sign(p, p2, p3);
-    let d3 = sign(p, p3, p1);
+    let d = [(p[0], p[1]), (p[1], p[2]), (p[2], p[0])].map(|(a, b)| sign(single_point, a, b));
 
-    let has_neg = d1 < 0.0 || d2 < 0.0 || d3 < 0.0;
-    let has_pos = d1 > 0.0 || d2 > 0.0 || d3 > 0.0;
+    let has_neg = d.iter().any(|distance| *distance < 0.0);
+    let has_pos = d.iter().any(|distance| *distance > 0.0);
 
     !(has_neg && has_pos)
 }
 
-pub fn get_distance_between_point_and_triangle(point: &glm::Vec2, a: &glm::Vec2, b: &glm::Vec2, c: &glm::Vec2) -> f32 {
-    let mut a = a;
-    let mut b = b;
-    let mut c = c;
-
-    ensure_counter_clockwise(&mut a, &mut b, &mut c);
+pub fn get_distance_between_point_and_triangle(single_point: &glm::Vec2, p: &[glm::Vec2; 3]) -> f32 {
+    let ordered = counter_clockwise(*p);
+    let [a, b, c] = ordered.each_ref();
 
     let ab_width = glm::distance(a, b);
     let bc_width = glm::distance(b, c);
@@ -51,26 +46,28 @@ pub fn get_distance_between_point_and_triangle(point: &glm::Vec2, a: &glm::Vec2,
         ((p2.y - p1.y) * point.x - (p2.x - p1.x) * point.y + p2.x * p1.y - p2.y * p1.x) / side_width
     }
 
-    let ab_distance = get_distance_to_side(point, a, b, ab_width);
-    let bc_distance = get_distance_to_side(point, b, c, bc_width);
-    let ca_distance = get_distance_to_side(point, c, a, ca_width);
+    let ab_distance = get_distance_to_side(single_point, a, b, ab_width);
+    let bc_distance = get_distance_to_side(single_point, b, c, bc_width);
+    let ca_distance = get_distance_to_side(single_point, c, a, ca_width);
+
     ab_distance.max(bc_distance).max(ca_distance)
 }
 
-fn ensure_counter_clockwise<'a>(a: &mut &'a glm::Vec2, b: &mut &'a glm::Vec2, c: &mut &'a glm::Vec2) {
+fn counter_clockwise<'a>(points: [glm::Vec2; 3]) -> [glm::Vec2; 3] {
     use std::cmp::Ordering;
-    let mut array: [&glm::Vec2; 3] = [a, b, c];
-    let center = get_triangle_center(**a, **b, **c);
-    array.sort_by(|u, v| {
+
+    let mut points = points;
+    let center = get_triangle_center(points);
+
+    points.sort_by(|u, v| {
         if is_point_less_in_clockwise(&center, u, v) {
             Ordering::Greater
         } else {
             Ordering::Less
         }
     });
-    *a = array[0];
-    *b = array[1];
-    *c = array[2];
+
+    points
 }
 
 fn is_point_less_in_clockwise(center: &glm::Vec2, a: &glm::Vec2, b: &glm::Vec2) -> bool {
@@ -100,6 +97,6 @@ fn is_point_less_in_clockwise(center: &glm::Vec2, a: &glm::Vec2, b: &glm::Vec2) 
     d1 > d2
 }
 
-pub fn get_triangle_center(p1: glm::Vec2, p2: glm::Vec2, p3: glm::Vec2) -> glm::Vec2 {
-    (p1 + p2 + p3) / 3.0
+pub fn get_triangle_center(p: [glm::Vec2; 3]) -> glm::Vec2 {
+    p.iter().sum::<glm::Vec2>() / 3.0
 }

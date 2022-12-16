@@ -116,10 +116,10 @@ impl ContextMenu {
 }
 
 impl ContextMenuOption {
-    pub fn new(friendly_name: String, friendly_shortcut: String, action: ContextAction) -> Self {
+    pub fn new(friendly_name: impl Into<String>, friendly_shortcut: impl Into<String>, action: ContextAction) -> Self {
         Self {
-            friendly_name,
-            friendly_shortcut,
+            friendly_name: friendly_name.into(),
+            friendly_shortcut: friendly_shortcut.into(),
             action,
             text_display: None,
             shortcut_display: None,

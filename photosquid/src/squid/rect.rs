@@ -360,7 +360,7 @@ impl Rect {
         }
     }
 
-    pub fn build(&self, builder: &mut impl lyon::path::builder::PathBuilder) {
+    pub fn build(&self, document: &mut svg::Document) {
         let RectData { position, size, radii, .. } = self.data.get_real();
         let position = position.reveal();
 
@@ -369,7 +369,7 @@ impl Rect {
         let hw = size.x * 0.5;
         let hh = size.y * 0.5;
 
-        builder.add_rounded_rectangle(&Box2D::new(point(x - hw, y - hh), point(x + hw, y + hh)), &radii.into(), Winding::Positive, &[]);
+        // builder.add_rounded_rectangle(&Box2D::new(point(x - hw, y - hh), point(x + hw, y + hh)), &radii.into(), Winding::Positive, &[]);
     }
 }
 

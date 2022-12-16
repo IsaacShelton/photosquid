@@ -22,6 +22,7 @@ use crate::{
 };
 use angular_units::Rad;
 use circle::Circle;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use nalgebra_glm as glm;
 use rect::Rect;
@@ -36,7 +37,7 @@ new_key_type! {
 }
 
 #[derive(Serialize, Deserialize)]
-enum SquidData {
+enum SquidKind {
     Rect(Rect),
     Circle(Circle),
     Tri(Tri),
@@ -49,7 +50,7 @@ pub struct Squid {
     #[serde(with = "approx_instant")]
     created: Instant,
 
-    data: SquidData,
+    kind: SquidKind,
 }
 
 impl Squid {
@@ -70,7 +71,7 @@ impl Squid {
         Self {
             name: None,
             created: Instant::now(),
-            data: SquidData::Rect(Rect {
+            kind: SquidKind::Rect(Rect {
                 mesh: None,
                 data: Smooth::new(data, None),
                 moving_corner: None,
@@ -101,7 +102,7 @@ impl Squid {
         Self {
             name: None,
             created: Instant::now(),
-            data: SquidData::Circle(Circle {
+            kind: SquidKind::Circle(Circle {
                 mesh: None,
                 data: Smooth::new(data, None),
                 translate_behavior: Default::default(),
@@ -115,13 +116,11 @@ impl Squid {
         }
     }
 
-    pub fn tri(p1: glm::Vec2, p2: glm::Vec2, p3: glm::Vec2, rotation: Rad<f32>, color: Color) -> Self {
-        let position = get_triangle_center(p1, p2, p3);
+    pub fn tri(p: [glm::Vec2; 3], rotation: Rad<f32>, color: Color) -> Self {
+        let position = get_triangle_center(p);
 
         let data = TriData {
-            p1: MultiLerp::From(p1 - position),
-            p2: MultiLerp::From(p2 - position),
-            p3: MultiLerp::From(p3 - position),
+            p: p.map(|point| MultiLerp::From(point - position)),
             position: MultiLerp::From(position),
             rotation,
             color: NoLerp(color),
@@ -131,25 +130,21 @@ impl Squid {
     }
 
     pub fn tri_from(data: TriData) -> Self {
-        let p1 = data.p1.reveal();
-        let p2 = data.p2.reveal();
-        let p3 = data.p3.reveal();
+        let p = data.p.map(|point| point.reveal());
 
         Self {
             name: None,
             created: Instant::now(),
-            data: SquidData::Tri(Tri {
+            kind: SquidKind::Tri(Tri {
                 mesh: None,
                 data: Smooth::new(data, None),
-                mesh_p1: p1,
-                mesh_p2: p2,
-                mesh_p3: p3,
+                mesh_p: p,
                 moving_point: None,
                 translate_behavior: Default::default(),
                 rotating: false,
                 rotation_accumulator: Accumulator::new(),
                 virtual_rotation: Rad(0.0),
-                prescale_size: [p1, p2, p3],
+                prescale_size: p,
                 spread_behavior: Default::default(),
                 revolve_behavior: Default::default(),
                 dilate_behavior: Default::default(),
@@ -159,18 +154,18 @@ impl Squid {
 
     // Renders squid in regular state
     pub fn render(&mut self, ctx: &mut RenderCtx, as_preview: Option<PreviewParams>) {
-        match &mut self.data {
-            SquidData::Rect(rect) => rect.render(ctx, as_preview),
-            SquidData::Circle(circle) => circle.render(ctx, as_preview),
-            SquidData::Tri(tri) => tri.render(ctx, as_preview),
+        match &mut self.kind {
+            SquidKind::Rect(rect) => rect.render(ctx, as_preview),
+            SquidKind::Circle(circle) => circle.render(ctx, as_preview),
+            SquidKind::Tri(tri) => tri.render(ctx, as_preview),
         }
     }
 
     // Render additional selection indicators and helpers for when
     // the squid is selected
     pub fn get_selection_points(&self, camera: &Camera, output: &mut Vec<glm::Vec2>) {
-        match &self.data {
-            SquidData::Rect(rect) => {
+        match &self.kind {
+            SquidKind::Rect(rect) => {
                 let RectData { position, .. } = rect.data.get_animated();
                 output.push(camera.apply(&position.reveal()));
                 output.push(rect.get_rotate_handle(camera));
@@ -179,12 +174,12 @@ impl Squid {
                     output.push(camera.apply(&(position.reveal() + corner)));
                 }
             }
-            SquidData::Circle(circle) => {
+            SquidKind::Circle(circle) => {
                 let CircleData { position, .. } = circle.data.get_animated();
                 output.push(camera.apply(&position.reveal()));
                 output.push(circle.get_rotate_handle(camera));
             }
-            SquidData::Tri(tri) => {
+            SquidKind::Tri(tri) => {
                 let TriData { position, .. } = tri.data.get_animated();
 
                 output.push(camera.apply(&position.reveal()));
@@ -201,18 +196,18 @@ impl Squid {
     // user interaction
     // Returns if and how the interaction was captured
     pub fn interact(&mut self, interaction: &Interaction, camera: &Camera, _options: &InteractionOptions) -> Capture {
-        match &mut self.data {
-            SquidData::Rect(rect) => rect.interact(interaction, camera),
-            SquidData::Circle(circle) => circle.interact(interaction, camera),
-            SquidData::Tri(tri) => tri.interact(interaction, camera),
+        match &mut self.kind {
+            SquidKind::Rect(rect) => rect.interact(interaction, camera),
+            SquidKind::Circle(circle) => circle.interact(interaction, camera),
+            SquidKind::Tri(tri) => tri.interact(interaction, camera),
         }
     }
 
     fn translate_behavior(&mut self) -> Option<&mut TranslateBehavior> {
-        match &mut self.data {
-            SquidData::Rect(rect) => Some(&mut rect.translate_behavior),
-            SquidData::Circle(circle) => Some(&mut circle.translate_behavior),
-            SquidData::Tri(tri) => Some(&mut tri.translate_behavior),
+        match &mut self.kind {
+            SquidKind::Rect(rect) => Some(&mut rect.translate_behavior),
+            SquidKind::Circle(circle) => Some(&mut circle.translate_behavior),
+            SquidKind::Tri(tri) => Some(&mut tri.translate_behavior),
         }
     }
 
@@ -221,18 +216,18 @@ impl Squid {
             return;
         }
 
-        match &mut self.data {
-            SquidData::Rect(rect) => {
+        match &mut self.kind {
+            SquidKind::Rect(rect) => {
                 let mut new_data = *rect.data.get_real();
                 new_data.position = MultiLerp::Linear(new_data.position.reveal() + delta);
                 rect.data.set(new_data);
             }
-            SquidData::Circle(circle) => {
+            SquidKind::Circle(circle) => {
                 let mut new_data = *circle.data.get_real();
                 new_data.position = MultiLerp::Linear(new_data.position.reveal() + delta);
                 circle.data.set(new_data);
             }
-            SquidData::Tri(tri) => {
+            SquidKind::Tri(tri) => {
                 let mut new_data = *tri.data.get_real();
                 new_data.position = MultiLerp::Linear(new_data.position.reveal() + delta);
                 tri.data.set(new_data);
@@ -241,26 +236,26 @@ impl Squid {
     }
 
     fn rotate_behavior(&mut self) -> Option<&mut Accumulator<Rad<f32>>> {
-        match &mut self.data {
-            SquidData::Rect(rect) => Some(&mut rect.rotation_accumulator),
-            SquidData::Circle(circle) => Some(&mut circle.rotation_accumulator),
-            SquidData::Tri(tri) => Some(&mut tri.rotation_accumulator),
+        match &mut self.kind {
+            SquidKind::Rect(rect) => Some(&mut rect.rotation_accumulator),
+            SquidKind::Circle(circle) => Some(&mut circle.rotation_accumulator),
+            SquidKind::Tri(tri) => Some(&mut tri.rotation_accumulator),
         }
     }
 
     fn rotate_by(&mut self, delta_theta: Rad<f32>) {
-        match &mut self.data {
-            SquidData::Rect(rect) => {
+        match &mut self.kind {
+            SquidKind::Rect(rect) => {
                 let mut new_data = *rect.data.get_real();
                 new_data.rotation += delta_theta;
                 rect.data.set(new_data);
             }
-            SquidData::Circle(circle) => {
+            SquidKind::Circle(circle) => {
                 let mut new_data = *circle.data.get_real();
                 new_data.virtual_rotation += delta_theta;
                 circle.data.set(new_data);
             }
-            SquidData::Tri(tri) => {
+            SquidKind::Tri(tri) => {
                 let mut new_data = *tri.data.get_real();
                 new_data.rotation += delta_theta;
                 tri.data.set(new_data);
@@ -292,23 +287,21 @@ impl Squid {
 
     // Scales a squid body
     pub fn scale(&mut self, total_scale_factor: f32, _options: &InteractionOptions) {
-        match &mut self.data {
-            SquidData::Rect(rect) => {
+        match &mut self.kind {
+            SquidKind::Rect(rect) => {
                 let mut new_data = *rect.data.get_real();
                 new_data.size = total_scale_factor * rect.prescale_size;
                 rect.data.set(new_data);
                 rect.mesh = None;
             }
-            SquidData::Circle(circle) => {
+            SquidKind::Circle(circle) => {
                 let mut new_data = *circle.data.get_real();
                 new_data.radius = circle.prescale_size * total_scale_factor;
                 circle.data.set(new_data);
             }
-            SquidData::Tri(tri) => {
+            SquidKind::Tri(tri) => {
                 let mut new_data = *tri.data.get_real();
-                new_data.p1 = MultiLerp::Linear(tri.prescale_size[0] * total_scale_factor);
-                new_data.p2 = MultiLerp::Linear(tri.prescale_size[1] * total_scale_factor);
-                new_data.p3 = MultiLerp::Linear(tri.prescale_size[2] * total_scale_factor);
+                new_data.p = tri.prescale_size.map(|axis| MultiLerp::Linear(total_scale_factor * axis));
                 tri.data.set(new_data);
             }
         }
@@ -316,18 +309,18 @@ impl Squid {
 
     // Spreads a squid body toward/from a point
     pub fn spread(&mut self, current: &glm::Vec2, _options: &InteractionOptions) {
-        match &mut self.data {
-            SquidData::Rect(rect) => {
+        match &mut self.kind {
+            SquidKind::Rect(rect) => {
                 let mut new_data = *rect.data.get_real();
                 new_data.position = MultiLerp::Linear(rect.spread_behavior.express(current));
                 rect.data.set(new_data);
             }
-            SquidData::Circle(circle) => {
+            SquidKind::Circle(circle) => {
                 let mut new_data = *circle.data.get_real();
                 new_data.position = MultiLerp::Linear(circle.spread_behavior.express(current));
                 circle.data.set(new_data);
             }
-            SquidData::Tri(tri) => {
+            SquidKind::Tri(tri) => {
                 let mut new_data = *tri.data.get_real();
                 new_data.position = MultiLerp::Linear(tri.spread_behavior.express(current));
                 tri.data.set(new_data);
@@ -337,8 +330,8 @@ impl Squid {
 
     // Revolves a squid body around point
     pub fn revolve(&mut self, current: &glm::Vec2, options: &InteractionOptions) {
-        match &mut self.data {
-            SquidData::Rect(rect) => {
+        match &mut self.kind {
+            SquidKind::Rect(rect) => {
                 if let Some(expression) = rect.revolve_behavior.express(current, options) {
                     let mut new_data = *rect.data.get_real();
                     new_data.position = MultiLerp::Circle(expression.apply_origin_rotation_to_center(), expression.origin);
@@ -346,7 +339,7 @@ impl Squid {
                     rect.data.set(new_data);
                 }
             }
-            SquidData::Circle(circle) => {
+            SquidKind::Circle(circle) => {
                 if let Some(expression) = circle.revolve_behavior.express(current, options) {
                     let mut new_data = *circle.data.get_real();
                     new_data.position = MultiLerp::Circle(expression.apply_origin_rotation_to_center(), expression.origin);
@@ -354,7 +347,7 @@ impl Squid {
                     circle.data.set(new_data);
                 }
             }
-            SquidData::Tri(tri) => {
+            SquidKind::Tri(tri) => {
                 if let Some(expression) = tri.revolve_behavior.express(current, options) {
                     let mut new_data = *tri.data.get_real();
                     new_data.position = MultiLerp::Circle(expression.apply_origin_rotation_to_center(), expression.origin);
@@ -367,8 +360,8 @@ impl Squid {
 
     // Dilates a squid body toward/from a point
     pub fn dilate(&mut self, current: &glm::Vec2, _options: &InteractionOptions) {
-        match &mut self.data {
-            SquidData::Rect(rect) => {
+        match &mut self.kind {
+            SquidKind::Rect(rect) => {
                 let expression = rect.dilate_behavior.express(current);
                 let mut new_data = *rect.data.get_real();
                 new_data.position = MultiLerp::Linear(expression.position);
@@ -376,20 +369,18 @@ impl Squid {
                 rect.data.set(new_data);
                 rect.mesh = None;
             }
-            SquidData::Circle(circle) => {
+            SquidKind::Circle(circle) => {
                 let mut new_data = *circle.data.get_real();
                 let expression = circle.dilate_behavior.express(current);
                 new_data.position = MultiLerp::Linear(expression.position);
                 new_data.radius = circle.prescale_size * expression.total_scale_factor;
                 circle.data.set(new_data);
             }
-            SquidData::Tri(tri) => {
+            SquidKind::Tri(tri) => {
                 let mut new_data = *tri.data.get_real();
                 let expression = tri.dilate_behavior.express(current);
                 new_data.position = MultiLerp::Linear(expression.position);
-                new_data.p1 = MultiLerp::Linear(expression.total_scale_factor * tri.prescale_size[0]);
-                new_data.p2 = MultiLerp::Linear(expression.total_scale_factor * tri.prescale_size[1]);
-                new_data.p3 = MultiLerp::Linear(expression.total_scale_factor * tri.prescale_size[2]);
+                new_data.p = tri.prescale_size.map(|axis| MultiLerp::Linear(expression.total_scale_factor * axis));
                 tri.data.set(new_data);
             }
         }
@@ -398,8 +389,8 @@ impl Squid {
     // Attempts to get a selection for this squid or a selection for a limb of this squid
     // under the point (x, y)
     pub fn try_select(&self, underneath: glm::Vec2, camera: &Camera, self_reference: SquidRef) -> Option<NewSelection> {
-        match &self.data {
-            SquidData::Rect(rect) => {
+        match &self.kind {
+            SquidKind::Rect(rect) => {
                 if rect.is_point_over(underneath, camera) {
                     return Some(NewSelection {
                         selection: Selection::new(self_reference, None),
@@ -409,7 +400,7 @@ impl Squid {
                     });
                 }
             }
-            SquidData::Circle(circle) => {
+            SquidKind::Circle(circle) => {
                 if circle.is_point_over(underneath, camera) {
                     return Some(NewSelection {
                         selection: Selection::new(self_reference, None),
@@ -419,7 +410,7 @@ impl Squid {
                     });
                 }
             }
-            SquidData::Tri(tri) => {
+            SquidKind::Tri(tri) => {
                 if tri.is_point_over(underneath, camera) {
                     return Some(NewSelection {
                         selection: Selection::new(self_reference, None),
@@ -442,26 +433,27 @@ impl Squid {
     }
 
     pub fn is_point_over(&self, mouse_position: glm::Vec2, camera: &Camera) -> bool {
-        match &self.data {
-            SquidData::Rect(rect) => rect.is_point_over(mouse_position, camera),
-            SquidData::Circle(circle) => circle.is_point_over(mouse_position, camera),
-            SquidData::Tri(tri) => tri.is_point_over(mouse_position, camera),
+        match &self.kind {
+            SquidKind::Rect(rect) => rect.is_point_over(mouse_position, camera),
+            SquidKind::Circle(circle) => circle.is_point_over(mouse_position, camera),
+            SquidKind::Tri(tri) => tri.is_point_over(mouse_position, camera),
         }
     }
 
     pub fn as_viewport(&self) -> Option<RectData> {
-        match &self.data {
-            SquidData::Rect(rect) if rect.data.get_real().is_viewport => {
+        match &self.kind {
+            SquidKind::Rect(rect) if rect.data.get_real().is_viewport => {
                 return Some(*rect.data.get_real());
             }
             _ => None,
         }
     }
-    pub fn build(&self, builder: &mut impl lyon::path::builder::PathBuilder) {
-        match &self.data {
-            SquidData::Rect(rect) => rect.build(builder),
-            SquidData::Circle(circle) => circle.build(builder),
-            SquidData::Tri(tri) => tri.build(builder),
+
+    pub fn build(&self, document: &mut svg::Document) {
+        match &self.kind {
+            SquidKind::Rect(rect) => rect.build(document),
+            SquidKind::Circle(circle) => circle.build(document),
+            SquidKind::Tri(tri) => tri.build(document),
         }
     }
 
@@ -476,18 +468,18 @@ impl Squid {
 
     // Attempts to set the color of a squid
     pub fn set_color(&mut self, color: Color) {
-        match &mut self.data {
-            SquidData::Rect(rect) => {
+        match &mut self.kind {
+            SquidKind::Rect(rect) => {
                 let mut new_data = *rect.data.get_real();
                 new_data.color = NoLerp(color);
                 rect.data.set(new_data);
             }
-            SquidData::Circle(circle) => {
+            SquidKind::Circle(circle) => {
                 let mut new_data = *circle.data.get_real();
                 new_data.color = NoLerp(color);
                 circle.data.set(new_data);
             }
-            SquidData::Tri(tri) => {
+            SquidKind::Tri(tri) => {
                 let mut new_data = *tri.data.get_real();
                 new_data.color = NoLerp(color);
                 tri.data.set(new_data);
@@ -497,18 +489,18 @@ impl Squid {
 
     // Duplicates a squid
     pub fn duplicate(&self, offset: &glm::Vec2) -> Squid {
-        match &self.data {
-            SquidData::Rect(rect) => {
+        match &self.kind {
+            SquidKind::Rect(rect) => {
                 let mut real = *rect.data.get_real();
                 real.position = MultiLerp::From(real.position.reveal() + offset);
                 Squid::rect_from(real)
             }
-            SquidData::Circle(circle) => {
+            SquidKind::Circle(circle) => {
                 let mut real = *circle.data.get_real();
                 real.position = MultiLerp::From(real.position.reveal() + offset);
                 Squid::circle_from(real)
             }
-            SquidData::Tri(tri) => {
+            SquidKind::Tri(tri) => {
                 let mut real = *tri.data.get_real();
                 real.position = MultiLerp::From(real.position.reveal() + offset);
                 Squid::tri_from(real)
@@ -518,34 +510,36 @@ impl Squid {
 
     // Signals to the squid to initiate a certain user action
     pub fn initiate(&mut self, initiation: Initiation) {
-        match &mut self.data {
-            SquidData::Rect(rect) => rect.initiate(initiation),
-            SquidData::Circle(circle) => circle.initiate(initiation),
-            SquidData::Tri(tri) => tri.initiate(initiation),
+        match &mut self.kind {
+            SquidKind::Rect(rect) => rect.initiate(initiation),
+            SquidKind::Circle(circle) => circle.initiate(initiation),
+            SquidKind::Tri(tri) => tri.initiate(initiation),
         }
     }
 
     // Gets center of a squid
     pub fn get_center(&self) -> glm::Vec2 {
-        match &self.data {
-            SquidData::Rect(rect) => rect.data.get_animated().position.reveal(),
-            SquidData::Circle(circle) => circle.data.get_animated().position.reveal(),
-            SquidData::Tri(tri) => tri.data.get_animated().position.reveal(),
+        use SquidKind::*;
+
+        match &self.kind {
+            Rect(rect) => rect.data.get_animated().position.reveal(),
+            Circle(circle) => circle.data.get_animated().position.reveal(),
+            Tri(tri) => tri.data.get_animated().position.reveal(),
         }
     }
 
     // Opaque name getter/setter
     pub fn get_name(&self) -> &str {
-        self.name.as_deref().unwrap_or_else(|| match &self.data {
-            SquidData::Rect(rect) => {
+        self.name.as_deref().unwrap_or_else(|| match &self.kind {
+            SquidKind::Rect(rect) => {
                 if rect.data.get_animated().is_viewport {
                     "Unnamed Viewport"
                 } else {
                     "Unnamed Rect"
                 }
             }
-            SquidData::Circle(_) => "Unnamed Circle",
-            SquidData::Tri(_) => "Unnamed Tri",
+            SquidKind::Circle(_) => "Unnamed Circle",
+            SquidKind::Tri(_) => "Unnamed Tri",
         })
     }
 
@@ -555,24 +549,24 @@ impl Squid {
 
     // Returns the world positions of all "opaque" handles (aka handles that will take priority over new selections)
     pub fn get_opaque_handles(&self) -> Vec<glm::Vec2> {
-        match &self.data {
-            SquidData::Rect(rect) => {
+        match &self.kind {
+            SquidKind::Rect(rect) => {
                 let mut handles = rect.get_relative_corners();
                 handles.push(rect.get_rotate_handle(&IDENTITY_CAMERA));
                 handles
             }
-            SquidData::Circle(circle) => {
+            SquidKind::Circle(circle) => {
                 vec![circle.get_rotate_handle(&IDENTITY_CAMERA)]
             }
-            SquidData::Tri(tri) => {
+            SquidKind::Tri(tri) => {
                 let data = tri.data.get_animated();
                 let position = data.position.reveal();
-                vec![
-                    data.p1.reveal() + position,
-                    data.p2.reveal() + position,
-                    data.p3.reveal() + position,
-                    tri.get_rotate_handle(&IDENTITY_CAMERA),
-                ]
+
+                data.p
+                    .iter()
+                    .map(|point| point.reveal() + position)
+                    .chain(std::iter::once(tri.get_rotate_handle(&IDENTITY_CAMERA)))
+                    .collect_vec()
             }
         }
     }
@@ -621,13 +615,20 @@ lazy_static! {
 }
 
 pub fn common_context_menu(underneath: glm::Vec2, color_scheme: &ColorScheme) -> ContextMenu {
-    let delete = ContextMenuOption::new("Delete".to_string(), "X".to_string(), ContextAction::DeleteSelected);
-    let duplicate = ContextMenuOption::new("Duplicate".to_string(), "Shift+D".to_string(), ContextAction::DuplicateSelected);
-    let grab = ContextMenuOption::new("Grab".to_string(), "G".to_string(), ContextAction::GrabSelected);
-    let rotate = ContextMenuOption::new("Rotate".to_string(), "R".to_string(), ContextAction::RotateSelected);
-    let scale = ContextMenuOption::new("Scale".to_string(), "S".to_string(), ContextAction::ScaleSelected);
-    let collectively = ContextMenuOption::new("Collectively".to_string(), "C".to_string(), ContextAction::Collectively);
-    ContextMenu::new(underneath, vec![delete, duplicate, grab, rotate, scale, collectively], color_scheme.dark_ribbon)
+    use ContextAction::*;
+
+    ContextMenu::new(
+        underneath,
+        vec![
+            ContextMenuOption::new("Delete", "X", DeleteSelected),
+            ContextMenuOption::new("Duplicate", "Shift+D", DuplicateSelected),
+            ContextMenuOption::new("Grab", "G", GrabSelected),
+            ContextMenuOption::new("Rotate", "R", RotateSelected),
+            ContextMenuOption::new("Scale", "S", ScaleSelected),
+            ContextMenuOption::new("Collectively", "C", Collectively),
+        ],
+        color_scheme.dark_ribbon,
+    )
 }
 
 pub struct PreviewParams {

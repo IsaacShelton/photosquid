@@ -106,7 +106,7 @@ impl ToolBox {
         self.select_tool(1);
     }
 
-    pub fn create_standard_options_tabs(&mut self, tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>, display: &Display) {
+    pub fn create_standard_options_tabs(&mut self, tabs: &mut SlotMap<options::tab::TabRef, Box<dyn options::tab::Tab>>, display: &Display) {
         self.add_options_tab_button(options::TabButton::new(
             include_str!("_src_objs/object.obj"),
             PressAnimation::Deform,
@@ -240,7 +240,7 @@ impl ToolBox {
         None
     }
 
-    pub fn get_current_options_tab_key(&self) -> options::tab::TabKey {
+    pub fn get_current_options_tab_key(&self) -> options::tab::TabRef {
         self.options_tab_buttons[self.tab_selection.external_index].key
     }
 
@@ -311,7 +311,7 @@ impl ToolBox {
         &mut self,
         ctx: &mut RenderCtx,
         tools: &mut SlotMap<ToolKey, Tool>,
-        options_tabs: &mut SlotMap<options::tab::TabKey, Box<dyn options::tab::Tab>>,
+        options_tabs: &mut SlotMap<options::tab::TabRef, Box<dyn options::tab::Tab>>,
         color_scheme: &ColorScheme,
         text_system: &TextSystem,
         font: Rc<FontTexture>,

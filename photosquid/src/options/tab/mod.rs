@@ -10,7 +10,7 @@ use std::rc::Rc;
 pub use layers::Layers;
 pub use object::Object;
 
-new_key_type! { pub struct TabKey; }
+new_key_type! { pub struct TabRef; }
 
 pub trait Tab {
     fn interact(&mut self, interaction: Interaction, app: &mut App) -> Capture;

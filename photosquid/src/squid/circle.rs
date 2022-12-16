@@ -174,7 +174,19 @@ impl Circle {
         glm::distance(&real.position.reveal(), &point) < real.radius
     }
 
-    pub fn build(&self, _builder: &impl lyon::path::builder::PathBuilder) {}
+    pub fn build(&self, document: &mut svg::Document) {
+        use svg::Node;
+
+        let CircleData { position, radius, .. } = self.data.get_real();
+        let position = position.reveal();
+
+        let circle = svg::node::element::Circle::new()
+            .set("r", *radius)
+            .set("cx", position.x)
+            .set("cy", position.y)
+            .set("color", "rgba(255, 0, 0, 0)");
+        document.append(circle);
+    }
 
     fn reposition_radius(&mut self, mouse: &glm::Vec2, camera: &Camera) {
         let real_in_world = self.data.get_real();

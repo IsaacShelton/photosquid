@@ -23,9 +23,11 @@ pub fn interact(user_inputs: &mut [UserInput], interaction: Interaction, app: &m
             let rotation = Rad(user_inputs[0].as_text_input_mut().unwrap().text().parse::<f32>().unwrap_or_default() * std::f32::consts::PI / 180.0);
 
             app.insert(Squid::tri(
-                world_position + glm::vec2(0.0, -50.0),
-                world_position + glm::vec2(50.0, 50.0),
-                world_position + glm::vec2(-50.0, 50.0),
+                [
+                    world_position + glm::vec2(0.0, -50.0),
+                    world_position + glm::vec2(50.0, 50.0),
+                    world_position + glm::vec2(-50.0, 50.0),
+                ],
                 rotation,
                 color,
             ));

@@ -25,6 +25,7 @@ serde_json = "1.0"
 native-dialog = { version = "0.6.3", features = ["windows_dpi_awareness", "windows_visual_styles"] }
 svg = "0.10.0"
 lyon = "1.0.0"
+itertools = "0.10.5"
 
 # bincode = "1.2.1"
 # approx = "0.5.0"

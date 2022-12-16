@@ -7,6 +7,7 @@ use crate::{
     vertex::{Vertex, VertexXYUV},
 };
 use glium::{index::PrimitiveType, Display, VertexBuffer};
+use itertools::Itertools;
 use lyon::geom::Box2D;
 use nalgebra_glm as glm;
 
@@ -82,9 +83,10 @@ impl MeshXyz {
         Self::new(include_str!("_src_objs/shape/rect.obj"), display)
     }
 
-    pub fn new_shape_triangle(display: &glium::Display, p1: glm::Vec2, p2: glm::Vec2, p3: glm::Vec2) -> Self {
+    pub fn new_shape_triangle(display: &glium::Display, p: [glm::Vec2; 3]) -> Self {
         // We disregard normals and don't do back-face culling, so this is okay
-        let shape = vec![Vertex { position: p1.into() }, Vertex { position: p2.into() }, Vertex { position: p3.into() }];
+
+        let shape = p.iter().map(|point| Vertex { position: (*point).into() }).collect_vec();
 
         Self::from_vertices(&shape, display)
     }

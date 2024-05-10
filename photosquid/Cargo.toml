@@ -6,7 +6,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-glium = "0.*"
+glium = "0.31.0"
 nalgebra-glm = { version = "0.15", features = ["serde-serialize"] }
 tobj = "3.2"
 stringreader = "0.1"

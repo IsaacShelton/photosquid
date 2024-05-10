@@ -7,25 +7,27 @@ edition = "2018"
 
 [dependencies]
 glium = "0.31.0"
-nalgebra-glm = { version = "0.15", features = ["serde-serialize"] }
+nalgebra-glm = { version = "0.18", features = ["serde-serialize"] }
 tobj = "3.2"
 stringreader = "0.1"
-interpolation = "0.2"
+interpolation = "0.3"
 slotmap = { version = "1.0", features = ["serde"] }
-palette = "0.6"
+palette = "0.7.6"
 glium_text_rusttype = { path = "../glium_text_rusttype" }
-rand = "0.7"
-enum-as-inner = "0.3"
+rand = "0.8.5"
+enum-as-inner = "0.6"
 angular-units = { version = "0.2", features = ["serde"] }
-more-asserts="0.2"
+more-asserts="0.3.1"
 lazy_static = "1.4"
 derive_deref = "1.1.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-native-dialog = { version = "0.6.3", features = ["windows_dpi_awareness", "windows_visual_styles"] }
-svg = "0.10.0"
+native-dialog = { version = "0.7.0", features = ["windows_dpi_awareness", "windows_visual_styles"] }
+svg = "0.17.0"
 lyon = "1.0.0"
-itertools = "0.10.5"
+itertools = "0.12.1"
+mio = "0.8.11"
+bumpalo = "3.11.1"
 
 # bincode = "1.2.1"
 # approx = "0.5.0"

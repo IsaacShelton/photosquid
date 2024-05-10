@@ -35,7 +35,7 @@ impl Color {
         use palette::FromColor;
         use std::f32::consts::TAU;
         let hsv = palette::Hsv::from_color(self.to_palette_srgb());
-        let hue = hsv.hue.to_radians().rem_euclid(TAU) / TAU;
+        let hue = hsv.hue.into_radians().rem_euclid(TAU) / TAU;
         let hue = if hue == 1.0 { 0.0 } else { hue };
         let palette::Hsv { saturation, value, .. } = hsv;
         (hue, saturation, value)
